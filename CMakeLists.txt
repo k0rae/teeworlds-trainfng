@@ -1981,7 +1981,7 @@ set(GAME_GENERATED_SERVER
 )
 set(SERVER_SRC ${ENGINE_SERVER} ${GAME_SERVER} ${GAME_GENERATED_SERVER})
 if(TARGET_OS STREQUAL "windows")
-  set(SERVER_ICON "other/icons/DDNet-Server.rc")
+  set(SERVER_ICON "other/icons/TrainFNG-Server.rc")
 else()
   set(SERVER_ICON)
 endif()
