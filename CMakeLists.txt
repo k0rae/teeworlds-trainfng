@@ -1287,6 +1287,19 @@ set(EXPECTED_DATA
 set_glob(DATA GLOB_RECURSE "frag;json;map;otf;png;rules;ttf;txt;vert;wv" data ${EXPECTED_DATA})
 
 ########################################################################
+# CONF
+########################################################################
+
+set(EXPECTED_CONF
+  ddnet.cfg
+  server.cfg
+  trainfng.cfg
+  votes.cfg
+)
+
+set_glob(CONF GLOB_RECURSE "cfg" conf ${EXPECTED_CONF})
+
+########################################################################
 # COPY DATA, CONF AND DLLS
 ########################################################################
 
@@ -1295,6 +1308,12 @@ foreach(datafile ${DATA})
   get_filename_component(DESTINATION data/${OUT} PATH)
   file(MAKE_DIRECTORY ${DESTINATION})
   file(COPY ${datafile} DESTINATION ${DESTINATION})
+endforeach()
+foreach(conffile ${CONF})
+  file(RELATIVE_PATH OUT ${PROJECT_SOURCE_DIR}/conf ${conffile})
+  get_filename_component(DESTINATION conf/${OUT} PATH)
+  file(MAKE_DIRECTORY ${DESTINATION})
+  file(COPY ${conffile} DESTINATION ${DESTINATION})
 endforeach()
 set(COPY_FILES
   autoexec_server.cfg
@@ -2294,7 +2313,7 @@ set(CPACK_TARGETS
 if(STEAMAPI_KIND STREQUAL SHARED)
   list(APPEND CPACK_TARGETS ${TARGET_STEAMAPI})
 endif()
-set(CPACK_DIRS data)
+set(CPACK_DIRS conf data)
 set(CPACK_FILES
   license.txt
   storage.cfg
@@ -2307,6 +2326,7 @@ endif()
 
 if(NOT DEV)
   include(GNUInstallDirs)
+  install(DIRECTORY conf DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/ddnet COMPONENT conf)
   install(DIRECTORY data DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/ddnet COMPONENT data)
   install(TARGETS ${TARGET_CLIENT} DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT client)
   if(STEAMAPI_KIND STREQUAL SHARED)
@@ -2358,6 +2378,7 @@ if(CLIENT AND (DMGTOOLS_FOUND OR HDIUTIL))
     ${TARGET_SERVER}.app/Contents
     ${TARGET_SERVER}.app/Contents/MacOS
     ${TARGET_SERVER}.app/Contents/Resources
+    ${TARGET_SERVER}.app/Contents/Resources/conf
     ${TARGET_SERVER}.app/Contents/Resources/data
     ${TARGET_SERVER}.app/Contents/Resources/data/mapres
   )
@@ -2428,6 +2449,7 @@ if(CLIENT AND (DMGTOOLS_FOUND OR HDIUTIL))
       ${TARGET_SERVER}
       ${PROJECT_BINARY_DIR}/bundle/client/Info.plist
       ${PROJECT_BINARY_DIR}/bundle/server/Info.plist
+      conf
       data
       other/bundle/client/PkgInfo
       other/bundle/server/PkgInfo
