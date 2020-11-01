@@ -129,7 +129,7 @@ else()
   )
 endif()
 
-set(SERVER_EXECUTABLE DDNet-Server CACHE STRING "Name of the built server executable")
+set(SERVER_EXECUTABLE TrainFNG-Server CACHE STRING "Name of the built server executable")
 set(CLIENT_EXECUTABLE DDNet CACHE STRING "Name of the build client executable")
 
 ########################################################################
@@ -1139,28 +1139,9 @@ set(EXPECTED_DATA
   mapres/winter_mountains.png
   mapres/winter_mountains2.png
   mapres/winter_mountains3.png
-  maps/Gold\ Mine.map
-  maps/LearnToPlay.map
-  maps/Sunny\ Side\ Up.map
-  maps/Tsunami.map
-  maps/ctf1.map
-  maps/ctf2.map
-  maps/ctf3.map
-  maps/ctf4.map
-  maps/ctf5.map
-  maps/ctf6.map
-  maps/ctf7.map
-  maps/dm1.map
-  maps/dm2.map
-  maps/dm6.map
-  maps/dm7.map
-  maps/dm8.map
-  maps/dm9.map
+  maps/AliveFNG_solo.map
   maps/license.txt
-  maps7/Gold\ Mine.map
-  maps7/LearnToPlay.map
-  maps7/Sunny\ Side\ Up.map
-  maps7/Tsunami.map
+  maps7/AliveFNG_solo.map
   maps7/readme.txt
   menuimages/demos.png
   menuimages/editor.png
@@ -1306,7 +1287,20 @@ set(EXPECTED_DATA
 set_glob(DATA GLOB_RECURSE "frag;json;map;otf;png;rules;ttf;txt;vert;wv" data ${EXPECTED_DATA})
 
 ########################################################################
-# COPY DATA AND DLLS
+# CONF
+########################################################################
+
+set(EXPECTED_CONF
+  ddnet.cfg
+  server.cfg
+  trainfng.cfg
+  votes.cfg
+)
+
+set_glob(CONF GLOB_RECURSE "cfg" conf ${EXPECTED_CONF})
+
+########################################################################
+# COPY DATA, CONF AND DLLS
 ########################################################################
 
 foreach(datafile ${DATA})
@@ -1315,7 +1309,15 @@ foreach(datafile ${DATA})
   file(MAKE_DIRECTORY ${DESTINATION})
   file(COPY ${datafile} DESTINATION ${DESTINATION})
 endforeach()
+# file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/conf/")
+foreach(conffile ${CONF})
+  file(RELATIVE_PATH OUT ${PROJECT_SOURCE_DIR}/conf ${conffile})
+  get_filename_component(DESTINATION conf/${OUT} PATH)
+  file(MAKE_DIRECTORY ${DESTINATION})
+  file(COPY ${conffile} DESTINATION ${DESTINATION})
+endforeach()
 set(COPY_FILES
+  autoexec_server.cfg
   ${CURL_COPY_FILES}
   ${FREETYPE_COPY_FILES}
   ${OPUSFILE_COPY_FILES}
@@ -1979,7 +1981,7 @@ set(GAME_GENERATED_SERVER
 )
 set(SERVER_SRC ${ENGINE_SERVER} ${GAME_SERVER} ${GAME_GENERATED_SERVER})
 if(TARGET_OS STREQUAL "windows")
-  set(SERVER_ICON "other/icons/DDNet-Server.rc")
+  set(SERVER_ICON "other/icons/TrainFNG-Server.rc")
 else()
   set(SERVER_ICON)
 endif()
@@ -2272,6 +2274,7 @@ set(CPACK_SOURCE_FILES
   CMakeLists.txt
   README.md
   autoexec_server.cfg
+  conf/
   cmake/
   data/
   datasrc/
@@ -2311,7 +2314,7 @@ set(CPACK_TARGETS
 if(STEAMAPI_KIND STREQUAL SHARED)
   list(APPEND CPACK_TARGETS ${TARGET_STEAMAPI})
 endif()
-set(CPACK_DIRS data)
+set(CPACK_DIRS conf data)
 set(CPACK_FILES
   license.txt
   storage.cfg
@@ -2324,6 +2327,7 @@ endif()
 
 if(NOT DEV)
   include(GNUInstallDirs)
+  install(DIRECTORY conf DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/ddnet COMPONENT conf)
   install(DIRECTORY data DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/ddnet COMPONENT data)
   install(TARGETS ${TARGET_CLIENT} DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT client)
   if(STEAMAPI_KIND STREQUAL SHARED)
@@ -2375,6 +2379,7 @@ if(CLIENT AND (DMGTOOLS_FOUND OR HDIUTIL))
     ${TARGET_SERVER}.app/Contents
     ${TARGET_SERVER}.app/Contents/MacOS
     ${TARGET_SERVER}.app/Contents/Resources
+    ${TARGET_SERVER}.app/Contents/Resources/conf
     ${TARGET_SERVER}.app/Contents/Resources/data
     ${TARGET_SERVER}.app/Contents/Resources/data/mapres
   )
@@ -2445,6 +2450,7 @@ if(CLIENT AND (DMGTOOLS_FOUND OR HDIUTIL))
       ${TARGET_SERVER}
       ${PROJECT_BINARY_DIR}/bundle/client/Info.plist
       ${PROJECT_BINARY_DIR}/bundle/server/Info.plist
+      conf
       data
       other/bundle/client/PkgInfo
       other/bundle/server/PkgInfo
