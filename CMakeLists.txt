@@ -1287,19 +1287,6 @@ set(EXPECTED_DATA
 set_glob(DATA GLOB_RECURSE "frag;json;map;otf;png;rules;ttf;txt;vert;wv" data ${EXPECTED_DATA})
 
 ########################################################################
-# CONF
-########################################################################
-
-set(EXPECTED_CONF
-  ddnet.cfg
-  server.cfg
-  trainfng.cfg
-  votes.cfg
-)
-
-set_glob(CONF GLOB_RECURSE "cfg" conf ${EXPECTED_CONF})
-
-########################################################################
 # COPY DATA, CONF AND DLLS
 ########################################################################
 
@@ -1308,12 +1295,6 @@ foreach(datafile ${DATA})
   get_filename_component(DESTINATION data/${OUT} PATH)
   file(MAKE_DIRECTORY ${DESTINATION})
   file(COPY ${datafile} DESTINATION ${DESTINATION})
-endforeach()
-foreach(conffile ${CONF})
-  file(RELATIVE_PATH OUT ${PROJECT_SOURCE_DIR}/conf ${conffile})
-  get_filename_component(DESTINATION conf/${OUT} PATH)
-  file(MAKE_DIRECTORY ${DESTINATION})
-  file(COPY ${conffile} DESTINATION ${DESTINATION})
 endforeach()
 set(COPY_FILES
   autoexec_server.cfg
