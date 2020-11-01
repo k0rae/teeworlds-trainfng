@@ -4,5 +4,5 @@
 #define GAME_SERVER_GAMEMODES_GAMEMODE_H
 
 #define GAME_NAME "trainfng"
-#define TEST_NAME "trainfng"
+#define TEST_NAME "trainfng-test"
 #endif // GAME_SERVER_GAMEMODES_GAMEMODE_H
