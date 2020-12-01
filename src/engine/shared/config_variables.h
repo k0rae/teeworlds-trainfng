@@ -405,4 +405,4 @@ MACRO_CONFIG_INT(GfxUsePreinitBuffer, gfx_use_preinitialized_buffer, 0, 0, 1, CF
 MACRO_CONFIG_INT(ClVideoRecorderFPS, cl_video_recorder_fps, 60, 1, 1000, CFGFLAG_SAVE | CFGFLAG_CLIENT, "At which FPS the videorecorder should record demos.")
 
 // trainfng
-MACRO_CONFIG_STR(SvTrainfngTeam0Info, sv_trainfng_team_0_info, 128, "Welcome on trainfng\nTeam 01-49: laser\nTeam 50-63: grenade", CFGFLAG_SERVER, "Broadcast to display to players on team 0")
+MACRO_CONFIG_INT(SvNbLaserTeams, sv_nb_laser_teams, 49, 0, 63, CFGFLAG_SERVER, "Number of teams with laser, others will have grenade")
