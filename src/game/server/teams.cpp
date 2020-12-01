@@ -298,10 +298,10 @@ void CGameTeams::SetForceCharacterTeam(int ClientID, int Team)
 	CCharacter *pChar = Character(ClientID);
 	if(pChar)
 	{
-		pChar->GiveWeapon(WEAPON_GRENADE, Team < 50);
-		pChar->GiveWeapon(WEAPON_LASER, Team == 0 || Team >= 50);
+		pChar->GiveWeapon(WEAPON_GRENADE, Team == 0 || Team <= g_Config.m_SvNbLaserTeams);
+		pChar->GiveWeapon(WEAPON_LASER, Team == 0 || Team > g_Config.m_SvNbLaserTeams);
 
-		if(Team >= 50)
+		if(Team > g_Config.m_SvNbLaserTeams)
 			pChar->SetActiveWeapon(WEAPON_GRENADE);
 		else if(Team > 0)
 			pChar->SetActiveWeapon(WEAPON_LASER);
@@ -763,8 +763,8 @@ void CGameTeams::OnCharacterSpawn(int ClientID)
 	if(GetSaving(Team))
 		return;
 
-	Character(ClientID)->GiveWeapon(WEAPON_GRENADE, Team < 50);
-	Character(ClientID)->GiveWeapon(WEAPON_LASER, Team == 0 || Team >= 50);
+	Character(ClientID)->GiveWeapon(WEAPON_GRENADE, Team == 0 || Team <= g_Config.m_SvNbLaserTeams);
+	Character(ClientID)->GiveWeapon(WEAPON_LASER, Team == 0 || Team > g_Config.m_SvNbLaserTeams);
 }
 
 void CGameTeams::OnCharacterDeath(int ClientID, int Weapon)
