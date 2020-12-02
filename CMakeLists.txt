@@ -33,12 +33,12 @@ endif()
 if(POLICY CMP0048)
   cmake_policy(SET CMP0048 NEW)
   if(VERSION_PATCH STREQUAL "0")
-    project(DDNet VERSION ${VERSION_MAJOR}.${VERSION_MINOR})
+    project(TrainFNG VERSION ${VERSION_MAJOR}.${VERSION_MINOR})
   else()
-    project(DDNet VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+    project(TrainFNG VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
   endif()
 else()
-  project(DDNet)
+  project(TrainFNG)
   set(PROJECT_VERSION_MAJOR ${VERSION_MAJOR})
   set(PROJECT_VERSION_MINOR ${VERSION_MINOR})
   set(PROJECT_VERSION_PATCH ${VERSION_PATCH})
@@ -93,7 +93,7 @@ option(INFORM_UPDATE "Inform about available updates" ON)
 option(VIDEORECORDER "Enable video recording support via FFmpeg" OFF)
 option(UPNP "Enable UPnP support" OFF)
 option(ANTIBOT "Enable support for a dynamic anticheat library" OFF)
-option(CLIENT "Compile client" ON)
+option(CLIENT "Compile client" OFF)
 option(DOWNLOAD_GTEST "Download and compile GTest" ${AUTO_DEPENDENCIES_DEFAULT})
 option(STEAM "Build the Steam release version" OFF)
 option(PREFER_BUNDLED_LIBS "Prefer bundled libraries over system libraries" ${AUTO_DEPENDENCIES_DEFAULT})
@@ -545,8 +545,7 @@ endif()
 ########################################################################
 
 if(NOT(GTEST_FOUND) AND DOWNLOAD_GTEST)
-  # Change to the 1.9.0 release tag once that works.
-  set(DDNET_GTEST_VERSION 7b6561c56e353100aca8458d7bc49c4e0119bae8)
+  set(DDNET_GTEST_VERSION 703bd9caab50b139428cea1aaff9974ebee5742e)
   configure_file(cmake/Download_GTest_CMakeLists.txt.in googletest-download/CMakeLists.txt)
   execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
     RESULT_VARIABLE result
@@ -1140,8 +1139,10 @@ set(EXPECTED_DATA
   mapres/winter_mountains2.png
   mapres/winter_mountains3.png
   maps/AliveFNG_solo.map
+  maps/fng.map
   maps/license.txt
   maps7/AliveFNG_solo.map
+  maps7/fng.map
   maps7/readme.txt
   menuimages/demos.png
   menuimages/editor.png
@@ -1287,19 +1288,6 @@ set(EXPECTED_DATA
 set_glob(DATA GLOB_RECURSE "frag;json;map;otf;png;rules;ttf;txt;vert;wv" data ${EXPECTED_DATA})
 
 ########################################################################
-# CONF
-########################################################################
-
-set(EXPECTED_CONF
-  ddnet.cfg
-  server.cfg
-  trainfng.cfg
-  votes.cfg
-)
-
-set_glob(CONF GLOB_RECURSE "cfg" conf ${EXPECTED_CONF})
-
-########################################################################
 # COPY DATA, CONF AND DLLS
 ########################################################################
 
@@ -1316,16 +1304,6 @@ foreach(conffile ${CONF})
   file(MAKE_DIRECTORY ${DESTINATION})
   file(COPY ${conffile} DESTINATION ${DESTINATION})
 endforeach()
-set(COPY_FILES
-  autoexec_server.cfg
-  ${CURL_COPY_FILES}
-  ${FREETYPE_COPY_FILES}
-  ${OPUSFILE_COPY_FILES}
-  ${SDL2_COPY_FILES}
-  ${SQLite3_COPY_FILES}
-  ${FFMPEG_COPY_FILES}
-  ${WEBSOCKETS_COPY_FILES}
-)
 file(COPY ${COPY_FILES} DESTINATION .)
 
 ########################################################################
@@ -2274,7 +2252,6 @@ set(CPACK_SOURCE_FILES
   CMakeLists.txt
   README.md
   autoexec_server.cfg
-  conf/
   cmake/
   data/
   datasrc/
@@ -2314,7 +2291,7 @@ set(CPACK_TARGETS
 if(STEAMAPI_KIND STREQUAL SHARED)
   list(APPEND CPACK_TARGETS ${TARGET_STEAMAPI})
 endif()
-set(CPACK_DIRS conf data)
+set(CPACK_DIRS data)
 set(CPACK_FILES
   license.txt
   storage.cfg
@@ -2327,7 +2304,6 @@ endif()
 
 if(NOT DEV)
   include(GNUInstallDirs)
-  install(DIRECTORY conf DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/ddnet COMPONENT conf)
   install(DIRECTORY data DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/ddnet COMPONENT data)
   install(TARGETS ${TARGET_CLIENT} DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT client)
   if(STEAMAPI_KIND STREQUAL SHARED)
@@ -2379,7 +2355,6 @@ if(CLIENT AND (DMGTOOLS_FOUND OR HDIUTIL))
     ${TARGET_SERVER}.app/Contents
     ${TARGET_SERVER}.app/Contents/MacOS
     ${TARGET_SERVER}.app/Contents/Resources
-    ${TARGET_SERVER}.app/Contents/Resources/conf
     ${TARGET_SERVER}.app/Contents/Resources/data
     ${TARGET_SERVER}.app/Contents/Resources/data/mapres
   )
@@ -2450,7 +2425,6 @@ if(CLIENT AND (DMGTOOLS_FOUND OR HDIUTIL))
       ${TARGET_SERVER}
       ${PROJECT_BINARY_DIR}/bundle/client/Info.plist
       ${PROJECT_BINARY_DIR}/bundle/server/Info.plist
-      conf
       data
       other/bundle/client/PkgInfo
       other/bundle/server/PkgInfo
