@@ -1140,8 +1140,10 @@ set(EXPECTED_DATA
   mapres/winter_mountains2.png
   mapres/winter_mountains3.png
   maps/AliveFNG_solo.map
+  maps/fng.map
   maps/license.txt
   maps7/AliveFNG_solo.map
+  maps7/fng.map
   maps7/readme.txt
   menuimages/demos.png
   menuimages/editor.png
