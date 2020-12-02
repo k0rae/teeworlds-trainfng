@@ -93,7 +93,7 @@ option(INFORM_UPDATE "Inform about available updates" ON)
 option(VIDEORECORDER "Enable video recording support via FFmpeg" OFF)
 option(UPNP "Enable UPnP support" OFF)
 option(ANTIBOT "Enable support for a dynamic anticheat library" OFF)
-option(CLIENT "Compile client" ON)
+option(CLIENT "Compile client" OFF)
 option(DOWNLOAD_GTEST "Download and compile GTest" ${AUTO_DEPENDENCIES_DEFAULT})
 option(STEAM "Build the Steam release version" OFF)
 option(PREFER_BUNDLED_LIBS "Prefer bundled libraries over system libraries" ${AUTO_DEPENDENCIES_DEFAULT})
@@ -1287,19 +1287,6 @@ set(EXPECTED_DATA
 set_glob(DATA GLOB_RECURSE "frag;json;map;otf;png;rules;ttf;txt;vert;wv" data ${EXPECTED_DATA})
 
 ########################################################################
-# CONF
-########################################################################
-
-set(EXPECTED_CONF
-  ddnet.cfg
-  server.cfg
-  trainfng.cfg
-  votes.cfg
-)
-
-set_glob(CONF GLOB_RECURSE "cfg" conf ${EXPECTED_CONF})
-
-########################################################################
 # COPY DATA, CONF AND DLLS
 ########################################################################
 
@@ -1316,16 +1303,6 @@ foreach(conffile ${CONF})
   file(MAKE_DIRECTORY ${DESTINATION})
   file(COPY ${conffile} DESTINATION ${DESTINATION})
 endforeach()
-set(COPY_FILES
-  autoexec_server.cfg
-  ${CURL_COPY_FILES}
-  ${FREETYPE_COPY_FILES}
-  ${OPUSFILE_COPY_FILES}
-  ${SDL2_COPY_FILES}
-  ${SQLite3_COPY_FILES}
-  ${FFMPEG_COPY_FILES}
-  ${WEBSOCKETS_COPY_FILES}
-)
 file(COPY ${COPY_FILES} DESTINATION .)
 
 ########################################################################
@@ -2274,7 +2251,6 @@ set(CPACK_SOURCE_FILES
   CMakeLists.txt
   README.md
   autoexec_server.cfg
-  conf/
   cmake/
   data/
   datasrc/
@@ -2314,7 +2290,7 @@ set(CPACK_TARGETS
 if(STEAMAPI_KIND STREQUAL SHARED)
   list(APPEND CPACK_TARGETS ${TARGET_STEAMAPI})
 endif()
-set(CPACK_DIRS conf data)
+set(CPACK_DIRS data)
 set(CPACK_FILES
   license.txt
   storage.cfg
@@ -2327,7 +2303,6 @@ endif()
 
 if(NOT DEV)
   include(GNUInstallDirs)
-  install(DIRECTORY conf DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/ddnet COMPONENT conf)
   install(DIRECTORY data DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/ddnet COMPONENT data)
   install(TARGETS ${TARGET_CLIENT} DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT client)
   if(STEAMAPI_KIND STREQUAL SHARED)
@@ -2379,7 +2354,6 @@ if(CLIENT AND (DMGTOOLS_FOUND OR HDIUTIL))
     ${TARGET_SERVER}.app/Contents
     ${TARGET_SERVER}.app/Contents/MacOS
     ${TARGET_SERVER}.app/Contents/Resources
-    ${TARGET_SERVER}.app/Contents/Resources/conf
     ${TARGET_SERVER}.app/Contents/Resources/data
     ${TARGET_SERVER}.app/Contents/Resources/data/mapres
   )
@@ -2450,7 +2424,6 @@ if(CLIENT AND (DMGTOOLS_FOUND OR HDIUTIL))
       ${TARGET_SERVER}
       ${PROJECT_BINARY_DIR}/bundle/client/Info.plist
       ${PROJECT_BINARY_DIR}/bundle/server/Info.plist
-      conf
       data
       other/bundle/client/PkgInfo
       other/bundle/server/PkgInfo
