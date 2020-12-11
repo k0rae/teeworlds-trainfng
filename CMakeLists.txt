@@ -2038,6 +2038,7 @@ set_src(TOOLS GLOB src/tools
   map_extract.cpp
   map_replace_image.cpp
   map_resave.cpp
+  map_update_fng.cpp
   packetgen.cpp
   unicode_confusables.cpp
   uuid.cpp
