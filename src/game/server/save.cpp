@@ -33,6 +33,7 @@ void CSaveTee::save(CCharacter *pChr)
 		m_aWeapons[i].m_Ammo = pChr->m_aWeapons[i].m_Ammo;
 		m_aWeapons[i].m_Ammocost = pChr->m_aWeapons[i].m_Ammocost;
 		m_aWeapons[i].m_Got = pChr->m_aWeapons[i].m_Got;
+		m_ReloadTimer[i] = pChr->m_ReloadTimer[i];
 	}
 
 	m_LastWeapon = pChr->m_LastWeapon;
@@ -101,8 +102,6 @@ void CSaveTee::save(CCharacter *pChr)
 	m_InputFire = pChr->m_SavedInput.m_Fire;
 	m_InputHook = pChr->m_SavedInput.m_Hook;
 
-	m_ReloadTimer = pChr->m_ReloadTimer;
-
 	FormatUuid(pChr->GameServer()->GameUuid(), m_aGameUuid, sizeof(m_aGameUuid));
 }
 
@@ -123,6 +122,7 @@ void CSaveTee::load(CCharacter *pChr, int Team)
 		pChr->m_aWeapons[i].m_Ammo = -1;
 		pChr->m_aWeapons[i].m_Ammocost = m_aWeapons[i].m_Ammocost;
 		pChr->m_aWeapons[i].m_Got = m_aWeapons[i].m_Got;
+		pChr->m_ReloadTimer[i] = m_ReloadTimer[i];
 	}
 
 	pChr->m_LastWeapon = m_LastWeapon;
@@ -195,8 +195,6 @@ void CSaveTee::load(CCharacter *pChr, int Team)
 	pChr->m_SavedInput.m_Jump = m_InputJump;
 	pChr->m_SavedInput.m_Fire = m_InputFire;
 	pChr->m_SavedInput.m_Hook = m_InputHook;
-
-	pChr->m_ReloadTimer = m_ReloadTimer;
 
 	pChr->SetSolo(m_IsSolo);
 
@@ -374,7 +372,8 @@ int CSaveTee::FromString(const char *String)
 		m_InputJump = 0;
 		m_InputFire = 0;
 		m_InputHook = 0;
-		m_ReloadTimer = 0;
+		for(int i = 0; i < NUM_WEAPONS; i++)
+			m_ReloadTimer[i] = 0;
 		// fall through
 	case 108:
 		return 0;
