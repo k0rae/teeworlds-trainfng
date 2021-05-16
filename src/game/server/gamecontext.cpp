@@ -2730,7 +2730,7 @@ void CGameContext::AddVote(const char *pDescription, const char *pCommand)
 
 	// check for duplicate entry
 	CVoteOptionServer *pOption = m_pVoteOptionFirst;
-	while(pOption)
+	/*while(pOption)
 	{
 		if(str_comp_nocase(pDescription, pOption->m_aDescription) == 0)
 		{
@@ -2740,7 +2740,7 @@ void CGameContext::AddVote(const char *pDescription, const char *pCommand)
 			return;
 		}
 		pOption = pOption->m_pNext;
-	}
+	}*/
 
 	// add the option
 	++m_NumVoteOptions;
