@@ -1,6 +1,14 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
-#include <algorithm> // sort  TODO: remove this
+#include "serverbrowser.h"
+
+#include "serverbrowser_http.h"
+#include "serverbrowser_ping_cache.h"
+
+#include <algorithm>
+#include <climits>
+#include <unordered_set>
+#include <vector>
 
 #include <base/hash_ctxt.h>
 #include <base/math.h>
@@ -8,21 +16,24 @@
 
 #include <engine/shared/config.h>
 #include <engine/shared/json.h>
+#include <engine/shared/masterserver.h>
 #include <engine/shared/memheap.h>
 #include <engine/shared/network.h>
 #include <engine/shared/protocol.h>
+#include <engine/shared/serverinfo.h>
 
 #include <engine/config.h>
 #include <engine/console.h>
+#include <engine/engine.h>
+#include <engine/favorites.h>
 #include <engine/friends.h>
-#include <engine/masterserver.h>
+#include <engine/serverbrowser.h>
 #include <engine/storage.h>
-
-#include <mastersrv/mastersrv.h>
 
 #include <engine/external/json-parser/json.h>
 
-#include "serverbrowser.h"
+#include <game/client/components/menus.h> // PAGE_DDNET
+
 class SortWrap
 {
 	typedef bool (CServerBrowser::*SortFunc)(int, int) const;
@@ -30,26 +41,19 @@ class SortWrap
 	CServerBrowser *m_pThis;
 
 public:
-	SortWrap(CServerBrowser *t, SortFunc f) :
-		m_pfnSort(f), m_pThis(t) {}
+	SortWrap(CServerBrowser *pServer, SortFunc Func) :
+		m_pfnSort(Func), m_pThis(pServer) {}
 	bool operator()(int a, int b) { return (g_Config.m_BrSortOrder ? (m_pThis->*m_pfnSort)(b, a) : (m_pThis->*m_pfnSort)(a, b)); }
 };
 
 CServerBrowser::CServerBrowser()
 {
-	m_pMasterServer = 0;
 	m_ppServerlist = 0;
 	m_pSortedServerlist = 0;
-
-	m_NumFavoriteServers = 0;
-
-	mem_zero(m_aServerlistIp, sizeof(m_aServerlistIp));
 
 	m_pFirstReqServer = 0; // request list
 	m_pLastReqServer = 0;
 	m_NumRequests = 0;
-
-	m_NeedRefresh = 0;
 
 	m_NumSortedServers = 0;
 	m_NumSortedServersCapacity = 0;
@@ -63,33 +67,105 @@ CServerBrowser::CServerBrowser()
 	m_ServerlistType = 0;
 	m_BroadcastTime = 0;
 	secure_random_fill(m_aTokenSeed, sizeof(m_aTokenSeed));
-	m_RequestNumber = 0;
 
 	m_pDDNetInfo = 0;
+
+	m_SortOnNextUpdate = false;
 }
 
 CServerBrowser::~CServerBrowser()
 {
-	if(m_ppServerlist)
-		free(m_ppServerlist);
+	free(m_ppServerlist);
+	free(m_pSortedServerlist);
+	json_value_free(m_pDDNetInfo);
 
-	if(m_pSortedServerlist)
-		free(m_pSortedServerlist);
-
-	if(m_pDDNetInfo)
-		json_value_free(m_pDDNetInfo);
+	delete m_pHttp;
+	m_pHttp = nullptr;
+	delete m_pPingCache;
+	m_pPingCache = nullptr;
 }
 
 void CServerBrowser::SetBaseInfo(class CNetClient *pClient, const char *pNetVersion)
 {
 	m_pNetClient = pClient;
-	str_copy(m_aNetVersion, pNetVersion, sizeof(m_aNetVersion));
-	m_pMasterServer = Kernel()->RequestInterface<IMasterServer>();
+	str_copy(m_aNetVersion, pNetVersion);
 	m_pConsole = Kernel()->RequestInterface<IConsole>();
+	m_pEngine = Kernel()->RequestInterface<IEngine>();
+	m_pFavorites = Kernel()->RequestInterface<IFavorites>();
 	m_pFriends = Kernel()->RequestInterface<IFriends>();
-	IConfig *pConfig = Kernel()->RequestInterface<IConfig>();
-	if(pConfig)
-		pConfig->RegisterCallback(ConfigSaveCallback, this);
+	m_pStorage = Kernel()->RequestInterface<IStorage>();
+	m_pPingCache = CreateServerBrowserPingCache(m_pConsole, m_pStorage);
+
+	RegisterCommands();
+}
+
+void CServerBrowser::OnInit()
+{
+	m_pHttp = CreateServerBrowserHttp(m_pEngine, m_pConsole, m_pStorage, g_Config.m_BrCachedBestServerinfoUrl);
+}
+
+void CServerBrowser::RegisterCommands()
+{
+	m_pConsole->Register("leak_ip_address_to_all_servers", "", CFGFLAG_CLIENT, Con_LeakIpAddress, this, "Leaks your IP address to all servers by pinging each of them, also acquiring the latency in the process");
+}
+
+void CServerBrowser::Con_LeakIpAddress(IConsole::IResult *pResult, void *pUserData)
+{
+	CServerBrowser *pThis = (CServerBrowser *)pUserData;
+
+	// We only consider the first address of every server.
+
+	std::vector<int> vSortedServers;
+	// Sort servers by IP address, ignoring port.
+	class CAddrComparer
+	{
+	public:
+		CServerBrowser *m_pThis;
+		bool operator()(int i, int j)
+		{
+			NETADDR Addr1 = m_pThis->m_ppServerlist[i]->m_Info.m_aAddresses[0];
+			NETADDR Addr2 = m_pThis->m_ppServerlist[j]->m_Info.m_aAddresses[0];
+			Addr1.port = 0;
+			Addr2.port = 0;
+			return net_addr_comp(&Addr1, &Addr2) < 0;
+		}
+	};
+	vSortedServers.reserve(pThis->m_NumServers);
+	for(int i = 0; i < pThis->m_NumServers; i++)
+	{
+		vSortedServers.push_back(i);
+	}
+	std::sort(vSortedServers.begin(), vSortedServers.end(), CAddrComparer{pThis});
+
+	// Group the servers into those with same IP address (but differing
+	// port).
+	NETADDR Addr;
+	int Start = -1;
+	for(int i = 0; i <= (int)vSortedServers.size(); i++)
+	{
+		NETADDR NextAddr;
+		if(i < (int)vSortedServers.size())
+		{
+			NextAddr = pThis->m_ppServerlist[vSortedServers[i]]->m_Info.m_aAddresses[0];
+			NextAddr.port = 0;
+		}
+		bool New = Start == -1 || i == (int)vSortedServers.size() || net_addr_comp(&Addr, &NextAddr) != 0;
+		if(Start != -1 && New)
+		{
+			int Chosen = Start + secure_rand_below(i - Start);
+			CServerEntry *pChosen = pThis->m_ppServerlist[vSortedServers[Chosen]];
+			pChosen->m_RequestIgnoreInfo = true;
+			pThis->QueueRequest(pChosen);
+			char aAddr[NETADDR_MAXSTRSIZE];
+			net_addr_str(&pChosen->m_Info.m_aAddresses[0], aAddr, sizeof(aAddr), true);
+			dbg_msg("serverbrowse/dbg", "queuing ping request for %s", aAddr);
+		}
+		if(i < (int)vSortedServers.size() && New)
+		{
+			Start = i;
+			Addr = NextAddr;
+		}
+	}
 }
 
 const CServerInfo *CServerBrowser::SortedGet(int Index) const
@@ -121,59 +197,59 @@ int CServerBrowser::GetExtraToken(int Token)
 
 bool CServerBrowser::SortCompareName(int Index1, int Index2) const
 {
-	CServerEntry *a = m_ppServerlist[Index1];
-	CServerEntry *b = m_ppServerlist[Index2];
+	CServerEntry *pIndex1 = m_ppServerlist[Index1];
+	CServerEntry *pIndex2 = m_ppServerlist[Index2];
 	//	make sure empty entries are listed last
-	return (a->m_GotInfo && b->m_GotInfo) || (!a->m_GotInfo && !b->m_GotInfo) ? str_comp(a->m_Info.m_aName, b->m_Info.m_aName) < 0 :
-										    a->m_GotInfo ? true : false;
+	return (pIndex1->m_GotInfo && pIndex2->m_GotInfo) || (!pIndex1->m_GotInfo && !pIndex2->m_GotInfo) ? str_comp(pIndex1->m_Info.m_aName, pIndex2->m_Info.m_aName) < 0 :
+													    pIndex1->m_GotInfo != 0;
 }
 
 bool CServerBrowser::SortCompareMap(int Index1, int Index2) const
 {
-	CServerEntry *a = m_ppServerlist[Index1];
-	CServerEntry *b = m_ppServerlist[Index2];
-	return str_comp(a->m_Info.m_aMap, b->m_Info.m_aMap) < 0;
+	CServerEntry *pIndex1 = m_ppServerlist[Index1];
+	CServerEntry *pIndex2 = m_ppServerlist[Index2];
+	return str_comp(pIndex1->m_Info.m_aMap, pIndex2->m_Info.m_aMap) < 0;
 }
 
 bool CServerBrowser::SortComparePing(int Index1, int Index2) const
 {
-	CServerEntry *a = m_ppServerlist[Index1];
-	CServerEntry *b = m_ppServerlist[Index2];
-	return a->m_Info.m_Latency < b->m_Info.m_Latency;
+	CServerEntry *pIndex1 = m_ppServerlist[Index1];
+	CServerEntry *pIndex2 = m_ppServerlist[Index2];
+	return pIndex1->m_Info.m_Latency < pIndex2->m_Info.m_Latency;
 }
 
 bool CServerBrowser::SortCompareGametype(int Index1, int Index2) const
 {
-	CServerEntry *a = m_ppServerlist[Index1];
-	CServerEntry *b = m_ppServerlist[Index2];
-	return str_comp(a->m_Info.m_aGameType, b->m_Info.m_aGameType) < 0;
+	CServerEntry *pIndex1 = m_ppServerlist[Index1];
+	CServerEntry *pIndex2 = m_ppServerlist[Index2];
+	return str_comp(pIndex1->m_Info.m_aGameType, pIndex2->m_Info.m_aGameType) < 0;
 }
 
 bool CServerBrowser::SortCompareNumPlayers(int Index1, int Index2) const
 {
-	CServerEntry *a = m_ppServerlist[Index1];
-	CServerEntry *b = m_ppServerlist[Index2];
-	return a->m_Info.m_NumFilteredPlayers > b->m_Info.m_NumFilteredPlayers;
+	CServerEntry *pIndex1 = m_ppServerlist[Index1];
+	CServerEntry *pIndex2 = m_ppServerlist[Index2];
+	return pIndex1->m_Info.m_NumFilteredPlayers > pIndex2->m_Info.m_NumFilteredPlayers;
 }
 
 bool CServerBrowser::SortCompareNumClients(int Index1, int Index2) const
 {
-	CServerEntry *a = m_ppServerlist[Index1];
-	CServerEntry *b = m_ppServerlist[Index2];
-	return a->m_Info.m_NumClients > b->m_Info.m_NumClients;
+	CServerEntry *pIndex1 = m_ppServerlist[Index1];
+	CServerEntry *pIndex2 = m_ppServerlist[Index2];
+	return pIndex1->m_Info.m_NumClients > pIndex2->m_Info.m_NumClients;
 }
 
 bool CServerBrowser::SortCompareNumPlayersAndPing(int Index1, int Index2) const
 {
-	CServerEntry *a = m_ppServerlist[Index1];
-	CServerEntry *b = m_ppServerlist[Index2];
+	CServerEntry *pIndex1 = m_ppServerlist[Index1];
+	CServerEntry *pIndex2 = m_ppServerlist[Index2];
 
-	if(a->m_Info.m_NumFilteredPlayers == b->m_Info.m_NumFilteredPlayers)
-		return a->m_Info.m_Latency > b->m_Info.m_Latency;
-	else if(a->m_Info.m_NumFilteredPlayers == 0 || b->m_Info.m_NumFilteredPlayers == 0 || a->m_Info.m_Latency / 100 == b->m_Info.m_Latency / 100)
-		return a->m_Info.m_NumFilteredPlayers < b->m_Info.m_NumFilteredPlayers;
+	if(pIndex1->m_Info.m_NumFilteredPlayers == pIndex2->m_Info.m_NumFilteredPlayers)
+		return pIndex1->m_Info.m_Latency > pIndex2->m_Info.m_Latency;
+	else if(pIndex1->m_Info.m_NumFilteredPlayers == 0 || pIndex2->m_Info.m_NumFilteredPlayers == 0 || pIndex1->m_Info.m_Latency / 100 == pIndex2->m_Info.m_Latency / 100)
+		return pIndex1->m_Info.m_NumFilteredPlayers < pIndex2->m_Info.m_NumFilteredPlayers;
 	else
-		return a->m_Info.m_Latency > b->m_Info.m_Latency;
+		return pIndex1->m_Info.m_Latency > pIndex2->m_Info.m_Latency;
 }
 
 void CServerBrowser::Filter()
@@ -184,8 +260,7 @@ void CServerBrowser::Filter()
 	// allocate the sorted list
 	if(m_NumSortedServersCapacity < m_NumServers)
 	{
-		if(m_pSortedServerlist)
-			free(m_pSortedServerlist);
+		free(m_pSortedServerlist);
 		m_NumSortedServersCapacity = m_NumServers;
 		m_pSortedServerlist = (int *)calloc(m_NumSortedServersCapacity, sizeof(int));
 	}
@@ -201,15 +276,11 @@ void CServerBrowser::Filter()
 			Filtered = 1;
 		else if(g_Config.m_BrFilterPw && m_ppServerlist[i]->m_Info.m_Flags & SERVER_FLAG_PASSWORD)
 			Filtered = 1;
-		else if(g_Config.m_BrFilterPing && g_Config.m_BrFilterPing < m_ppServerlist[i]->m_Info.m_Latency)
-			Filtered = 1;
-		else if(g_Config.m_BrFilterCompatversion && str_comp_num(m_ppServerlist[i]->m_Info.m_aVersion, m_aNetVersion, 3) != 0)
-			Filtered = 1;
 		else if(g_Config.m_BrFilterServerAddress[0] && !str_find_nocase(m_ppServerlist[i]->m_Info.m_aAddress, g_Config.m_BrFilterServerAddress))
 			Filtered = 1;
 		else if(g_Config.m_BrFilterGametypeStrict && g_Config.m_BrFilterGametype[0] && str_comp_nocase(m_ppServerlist[i]->m_Info.m_aGameType, g_Config.m_BrFilterGametype))
 			Filtered = 1;
-		else if(!g_Config.m_BrFilterGametypeStrict && g_Config.m_BrFilterGametype[0] && !str_find_nocase(m_ppServerlist[i]->m_Info.m_aGameType, g_Config.m_BrFilterGametype))
+		else if(!g_Config.m_BrFilterGametypeStrict && g_Config.m_BrFilterGametype[0] && !str_utf8_find_nocase(m_ppServerlist[i]->m_Info.m_aGameType, g_Config.m_BrFilterGametype))
 			Filtered = 1;
 		else if(g_Config.m_BrFilterUnfinishedMap && m_ppServerlist[i]->m_Info.m_HasRank == 1)
 			Filtered = 1;
@@ -236,7 +307,7 @@ void CServerBrowser::Filter()
 				m_ppServerlist[i]->m_Info.m_QuickSearchHit = 0;
 
 				// match against server name
-				if(str_find_nocase(m_ppServerlist[i]->m_Info.m_aName, g_Config.m_BrFilterString))
+				if(str_utf8_find_nocase(m_ppServerlist[i]->m_Info.m_aName, g_Config.m_BrFilterString))
 				{
 					MatchFound = 1;
 					m_ppServerlist[i]->m_Info.m_QuickSearchHit |= IServerBrowser::QUICK_SERVERNAME;
@@ -245,8 +316,8 @@ void CServerBrowser::Filter()
 				// match against players
 				for(p = 0; p < minimum(m_ppServerlist[i]->m_Info.m_NumClients, (int)MAX_CLIENTS); p++)
 				{
-					if(str_find_nocase(m_ppServerlist[i]->m_Info.m_aClients[p].m_aName, g_Config.m_BrFilterString) ||
-						str_find_nocase(m_ppServerlist[i]->m_Info.m_aClients[p].m_aClan, g_Config.m_BrFilterString))
+					if(str_utf8_find_nocase(m_ppServerlist[i]->m_Info.m_aClients[p].m_aName, g_Config.m_BrFilterString) ||
+						str_utf8_find_nocase(m_ppServerlist[i]->m_Info.m_aClients[p].m_aClan, g_Config.m_BrFilterString))
 					{
 						MatchFound = 1;
 						m_ppServerlist[i]->m_Info.m_QuickSearchHit |= IServerBrowser::QUICK_PLAYER;
@@ -255,7 +326,7 @@ void CServerBrowser::Filter()
 				}
 
 				// match against map
-				if(str_find_nocase(m_ppServerlist[i]->m_Info.m_aMap, g_Config.m_BrFilterString))
+				if(str_utf8_find_nocase(m_ppServerlist[i]->m_Info.m_aMap, g_Config.m_BrFilterString))
 				{
 					MatchFound = 1;
 					m_ppServerlist[i]->m_Info.m_QuickSearchHit |= IServerBrowser::QUICK_MAPNAME;
@@ -270,19 +341,19 @@ void CServerBrowser::Filter()
 				int MatchFound = 0;
 
 				// match against server name
-				if(str_find_nocase(m_ppServerlist[i]->m_Info.m_aName, g_Config.m_BrExcludeString))
+				if(str_utf8_find_nocase(m_ppServerlist[i]->m_Info.m_aName, g_Config.m_BrExcludeString))
 				{
 					MatchFound = 1;
 				}
 
 				// match against map
-				if(str_find_nocase(m_ppServerlist[i]->m_Info.m_aMap, g_Config.m_BrExcludeString))
+				if(str_utf8_find_nocase(m_ppServerlist[i]->m_Info.m_aMap, g_Config.m_BrExcludeString))
 				{
 					MatchFound = 1;
 				}
 
 				// match against gametype
-				if(str_find_nocase(m_ppServerlist[i]->m_Info.m_aGameType, g_Config.m_BrExcludeString))
+				if(str_utf8_find_nocase(m_ppServerlist[i]->m_Info.m_aGameType, g_Config.m_BrExcludeString))
 				{
 					MatchFound = 1;
 				}
@@ -318,7 +389,6 @@ int CServerBrowser::SortHash() const
 	i |= g_Config.m_BrFilterFriends << 7;
 	i |= g_Config.m_BrFilterPw << 8;
 	i |= g_Config.m_BrSortOrder << 9;
-	i |= g_Config.m_BrFilterCompatversion << 11;
 	i |= g_Config.m_BrFilterGametypeStrict << 12;
 	i |= g_Config.m_BrFilterUnfinishedMap << 13;
 	i |= g_Config.m_BrFilterCountry << 14;
@@ -328,17 +398,12 @@ int CServerBrowser::SortHash() const
 
 void SetFilteredPlayers(const CServerInfo &Item)
 {
-	if(g_Config.m_BrFilterSpectators)
-		Item.m_NumFilteredPlayers = Item.m_NumPlayers;
-	else
-		Item.m_NumFilteredPlayers = Item.m_NumClients;
+	Item.m_NumFilteredPlayers = g_Config.m_BrFilterSpectators ? Item.m_NumPlayers : Item.m_NumClients;
 	if(g_Config.m_BrFilterConnectingPlayers)
 	{
-		for(int i = 0; i < MAX_CLIENTS; i++)
+		for(const auto &Client : Item.m_aClients)
 		{
-			const CServerInfo::CClient &Client = Item.m_aClients[i];
-
-			if(str_comp(Client.m_aName, "(connecting)") == 0 && Client.m_aClan[0] == '\0' && Client.m_Country == -1 && Client.m_Score == 0)
+			if((!g_Config.m_BrFilterSpectators || Client.m_Player) && str_comp(Client.m_aName, "(connecting)") == 0 && Client.m_aClan[0] == '\0')
 				Item.m_NumFilteredPlayers--;
 		}
 	}
@@ -371,12 +436,8 @@ void CServerBrowser::Sort()
 	else if(g_Config.m_BrSort == IServerBrowser::SORT_GAMETYPE)
 		std::stable_sort(m_pSortedServerlist, m_pSortedServerlist + m_NumSortedServers, SortWrap(this, &CServerBrowser::SortCompareGametype));
 
-	// set indexes
-	for(i = 0; i < m_NumSortedServers; i++)
-		m_ppServerlist[m_pSortedServerlist[i]]->m_Info.m_SortedIndex = i;
-
-	str_copy(m_aFilterGametypeString, g_Config.m_BrFilterGametype, sizeof(m_aFilterGametypeString));
-	str_copy(m_aFilterString, g_Config.m_BrFilterString, sizeof(m_aFilterString));
+	str_copy(m_aFilterGametypeString, g_Config.m_BrFilterGametype);
+	str_copy(m_aFilterString, g_Config.m_BrFilterString);
 	m_Sorthash = SortHash();
 }
 
@@ -402,14 +463,12 @@ void CServerBrowser::RemoveRequest(CServerEntry *pEntry)
 
 CServerBrowser::CServerEntry *CServerBrowser::Find(const NETADDR &Addr)
 {
-	CServerEntry *pEntry = m_aServerlistIp[Addr.ip[0]];
-
-	for(; pEntry; pEntry = pEntry->m_pNextIp)
+	auto Entry = m_ByAddr.find(Addr);
+	if(Entry == m_ByAddr.end())
 	{
-		if(net_addr_comp(&pEntry->m_Addr, &Addr) == 0)
-			return pEntry;
+		return nullptr;
 	}
-	return (CServerEntry *)0;
+	return m_ppServerlist[Entry->second];
 }
 
 void CServerBrowser::QueueRequest(CServerEntry *pEntry)
@@ -425,89 +484,163 @@ void CServerBrowser::QueueRequest(CServerEntry *pEntry)
 	m_NumRequests++;
 }
 
+void ServerBrowserFormatAddresses(char *pBuffer, int BufferSize, NETADDR *pAddrs, int NumAddrs)
+{
+	for(int i = 0; i < NumAddrs; i++)
+	{
+		if(i != 0)
+		{
+			if(BufferSize <= 1)
+			{
+				return;
+			}
+			pBuffer[0] = ',';
+			pBuffer[1] = 0;
+			pBuffer += 1;
+			BufferSize -= 1;
+		}
+		if(BufferSize <= 1)
+		{
+			return;
+		}
+		net_addr_str(&pAddrs[i], pBuffer, BufferSize, true);
+		int Length = str_length(pBuffer);
+		pBuffer += Length;
+		BufferSize -= Length;
+	}
+}
+
 void CServerBrowser::SetInfo(CServerEntry *pEntry, const CServerInfo &Info)
 {
-	bool Fav = pEntry->m_Info.m_Favorite;
-	bool Off = pEntry->m_Info.m_Official;
+	CServerInfo TmpInfo = pEntry->m_Info;
 	pEntry->m_Info = Info;
-	pEntry->m_Info.m_Favorite = Fav;
-	pEntry->m_Info.m_Official = Off;
-	pEntry->m_Info.m_NetAddr = pEntry->m_Addr;
+	pEntry->m_Info.m_Favorite = TmpInfo.m_Favorite;
+	pEntry->m_Info.m_FavoriteAllowPing = TmpInfo.m_FavoriteAllowPing;
+	pEntry->m_Info.m_Official = TmpInfo.m_Official;
+	mem_copy(pEntry->m_Info.m_aAddresses, TmpInfo.m_aAddresses, sizeof(pEntry->m_Info.m_aAddresses));
+	pEntry->m_Info.m_NumAddresses = TmpInfo.m_NumAddresses;
+	ServerBrowserFormatAddresses(pEntry->m_Info.m_aAddress, sizeof(pEntry->m_Info.m_aAddress), pEntry->m_Info.m_aAddresses, pEntry->m_Info.m_NumAddresses);
 
-	// all these are just for nice compatibility
-	if(pEntry->m_Info.m_aGameType[0] == '0' && pEntry->m_Info.m_aGameType[1] == 0)
-		str_copy(pEntry->m_Info.m_aGameType, "DM", sizeof(pEntry->m_Info.m_aGameType));
-	else if(pEntry->m_Info.m_aGameType[0] == '1' && pEntry->m_Info.m_aGameType[1] == 0)
-		str_copy(pEntry->m_Info.m_aGameType, "TDM", sizeof(pEntry->m_Info.m_aGameType));
-	else if(pEntry->m_Info.m_aGameType[0] == '2' && pEntry->m_Info.m_aGameType[1] == 0)
-		str_copy(pEntry->m_Info.m_aGameType, "CTF", sizeof(pEntry->m_Info.m_aGameType));
-
-	/*if(!request)
+	class CPlayerScoreNameLess
 	{
-		pEntry->m_Info.latency = (time_get()-pEntry->request_time)*1000/time_freq();
-		RemoveRequest(pEntry);
-	}*/
+	public:
+		bool operator()(const CServerInfo::CClient &p0, const CServerInfo::CClient &p1)
+		{
+			if(p0.m_Player && !p1.m_Player)
+				return true;
+			if(!p0.m_Player && p1.m_Player)
+				return false;
+
+			int Score0 = p0.m_Score;
+			int Score1 = p1.m_Score;
+			if(Score0 == -9999)
+				Score0 = INT_MIN;
+			if(Score1 == -9999)
+				Score1 = INT_MIN;
+
+			if(Score0 > Score1)
+				return true;
+			if(Score0 < Score1)
+				return false;
+			return str_comp_nocase(p0.m_aName, p1.m_aName) < 0;
+		}
+	};
+
+	std::sort(pEntry->m_Info.m_aClients, pEntry->m_Info.m_aClients + Info.m_NumReceivedClients, CPlayerScoreNameLess());
 
 	pEntry->m_GotInfo = 1;
 }
 
-CServerBrowser::CServerEntry *CServerBrowser::Add(const NETADDR &Addr)
+void CServerBrowser::SetLatency(NETADDR Addr, int Latency)
 {
-	int Hash = Addr.ip[0];
+	m_pPingCache->CachePing(Addr, Latency);
+
+	Addr.port = 0;
+	for(int i = 0; i < m_NumServers; i++)
+	{
+		if(!m_ppServerlist[i]->m_GotInfo)
+		{
+			continue;
+		}
+		bool Found = false;
+		for(int j = 0; j < m_ppServerlist[i]->m_Info.m_NumAddresses; j++)
+		{
+			NETADDR Other = m_ppServerlist[i]->m_Info.m_aAddresses[j];
+			Other.port = 0;
+			if(Addr == Other)
+			{
+				Found = true;
+				break;
+			}
+		}
+		if(!Found)
+		{
+			continue;
+		}
+		int Ping = m_pPingCache->GetPing(m_ppServerlist[i]->m_Info.m_aAddresses, m_ppServerlist[i]->m_Info.m_NumAddresses);
+		if(Ping == -1)
+		{
+			continue;
+		}
+		m_ppServerlist[i]->m_Info.m_Latency = Ping;
+		m_ppServerlist[i]->m_Info.m_LatencyIsEstimated = false;
+	}
+}
+
+CServerBrowser::CServerEntry *CServerBrowser::Add(const NETADDR *pAddrs, int NumAddrs)
+{
 	CServerEntry *pEntry = 0;
-	int i;
 
 	// create new pEntry
 	pEntry = (CServerEntry *)m_ServerlistHeap.Allocate(sizeof(CServerEntry));
 	mem_zero(pEntry, sizeof(CServerEntry));
 
 	// set the info
-	pEntry->m_Addr = Addr;
-	pEntry->m_Info.m_NetAddr = Addr;
+	mem_copy(pEntry->m_Info.m_aAddresses, pAddrs, NumAddrs * sizeof(pAddrs[0]));
+	pEntry->m_Info.m_NumAddresses = NumAddrs;
 
 	pEntry->m_Info.m_Latency = 999;
 	pEntry->m_Info.m_HasRank = -1;
-	net_addr_str(&Addr, pEntry->m_Info.m_aAddress, sizeof(pEntry->m_Info.m_aAddress), true);
+	ServerBrowserFormatAddresses(pEntry->m_Info.m_aAddress, sizeof(pEntry->m_Info.m_aAddress), pEntry->m_Info.m_aAddresses, pEntry->m_Info.m_NumAddresses);
 	str_copy(pEntry->m_Info.m_aName, pEntry->m_Info.m_aAddress, sizeof(pEntry->m_Info.m_aName));
 
 	// check if it's a favorite
-	for(i = 0; i < m_NumFavoriteServers; i++)
-	{
-		if(net_addr_comp(&Addr, &m_aFavoriteServers[i]) == 0)
-		{
-			pEntry->m_Info.m_Favorite = true;
-			break;
-		}
-	}
+	pEntry->m_Info.m_Favorite = m_pFavorites->IsFavorite(pEntry->m_Info.m_aAddresses, pEntry->m_Info.m_NumAddresses);
+	pEntry->m_Info.m_FavoriteAllowPing = m_pFavorites->IsPingAllowed(pEntry->m_Info.m_aAddresses, pEntry->m_Info.m_NumAddresses);
 
 	// check if it's an official server
-	for(int Network = 0; Network < NUM_NETWORKS; Network++)
+	bool Official = false;
+	for(int i = 0; !Official && i < (int)std::size(m_aNetworks); i++)
 	{
-		for(int i = 0; i < m_aNetworks[Network].m_NumCountries; i++)
+		for(int j = 0; !Official && j < m_aNetworks[i].m_NumCountries; j++)
 		{
-			CNetworkCountry *pCntr = &m_aNetworks[Network].m_aCountries[i];
-			for(int j = 0; j < pCntr->m_NumServers; j++)
+			CNetworkCountry *pCntr = &m_aNetworks[i].m_aCountries[j];
+			for(int k = 0; !Official && k < pCntr->m_NumServers; k++)
 			{
-				if(net_addr_comp(&Addr, &pCntr->m_aServers[j]) == 0)
+				for(int l = 0; !Official && l < NumAddrs; l++)
 				{
-					pEntry->m_Info.m_Official = true;
-					break;
+					if(pAddrs[l] == pCntr->m_aServers[k])
+					{
+						Official = true;
+					}
 				}
 			}
 		}
 	}
+	pEntry->m_Info.m_Official = Official;
 
-	// add to the hash list
-	pEntry->m_pNextIp = m_aServerlistIp[Hash];
-	m_aServerlistIp[Hash] = pEntry;
+	for(int i = 0; i < NumAddrs; i++)
+	{
+		m_ByAddr[pAddrs[i]] = m_NumServers;
+	}
 
 	if(m_NumServers == m_NumServerCapacity)
 	{
 		CServerEntry **ppNewlist;
 		m_NumServerCapacity += 100;
-		ppNewlist = (CServerEntry **)calloc(m_NumServerCapacity, sizeof(CServerEntry *));
+		ppNewlist = (CServerEntry **)calloc(m_NumServerCapacity, sizeof(CServerEntry *)); // NOLINT(bugprone-sizeof-expression)
 		if(m_NumServers > 0)
-			mem_copy(ppNewlist, m_ppServerlist, m_NumServers * sizeof(CServerEntry *));
+			mem_copy(ppNewlist, m_ppServerlist, m_NumServers * sizeof(CServerEntry *)); // NOLINT(bugprone-sizeof-expression)
 		free(m_ppServerlist);
 		m_ppServerlist = ppNewlist;
 	}
@@ -520,131 +653,111 @@ CServerBrowser::CServerEntry *CServerBrowser::Add(const NETADDR &Addr)
 	return pEntry;
 }
 
-void CServerBrowser::Set(const NETADDR &Addr, int Type, int Token, const CServerInfo *pInfo)
+void CServerBrowser::OnServerInfoUpdate(const NETADDR &Addr, int Token, const CServerInfo *pInfo)
 {
-	CServerEntry *pEntry = 0;
-	if(Type == IServerBrowser::SET_MASTER_ADD)
+	int BasicToken = Token;
+	int ExtraToken = 0;
+	if(pInfo->m_Type == SERVERINFO_EXTENDED)
 	{
-		if(m_ServerlistType != IServerBrowser::TYPE_INTERNET)
-			return;
-		m_LastPacketTick = 0;
-		if(!Find(Addr))
+		BasicToken = Token & 0xff;
+		ExtraToken = Token >> 8;
+	}
+
+	CServerEntry *pEntry = Find(Addr);
+
+	if(m_ServerlistType == IServerBrowser::TYPE_LAN)
+	{
+		NETADDR Broadcast;
+		mem_zero(&Broadcast, sizeof(Broadcast));
+		Broadcast.type = m_pNetClient->NetType() | NETTYPE_LINK_BROADCAST;
+		int TokenBC = GenerateToken(Broadcast);
+		bool Drop = false;
+		Drop = Drop || BasicToken != GetBasicToken(TokenBC);
+		Drop = Drop || (pInfo->m_Type == SERVERINFO_EXTENDED && ExtraToken != GetExtraToken(TokenBC));
+		if(Drop)
 		{
-			pEntry = Add(Addr);
-			QueueRequest(pEntry);
+			return;
+		}
+
+		if(!pEntry)
+			pEntry = Add(&Addr, 1);
+	}
+	else
+	{
+		if(!pEntry)
+		{
+			return;
+		}
+		int TokenAddr = GenerateToken(Addr);
+		bool Drop = false;
+		Drop = Drop || BasicToken != GetBasicToken(TokenAddr);
+		Drop = Drop || (pInfo->m_Type == SERVERINFO_EXTENDED && ExtraToken != GetExtraToken(TokenAddr));
+		if(Drop)
+		{
+			return;
 		}
 	}
-	else if(Type == IServerBrowser::SET_FAV_ADD)
-	{
-		if(m_ServerlistType != IServerBrowser::TYPE_FAVORITES)
-			return;
 
-		if(!Find(Addr))
+	if(m_ServerlistType == IServerBrowser::TYPE_LAN)
+	{
+		SetInfo(pEntry, *pInfo);
+		pEntry->m_Info.m_Latency = minimum(static_cast<int>((time_get() - m_BroadcastTime) * 1000 / time_freq()), 999);
+		if(pInfo->m_Type == SERVERINFO_VANILLA && Is64Player(pInfo))
 		{
-			pEntry = Add(Addr);
-			QueueRequest(pEntry);
+			pEntry->m_Request64Legacy = true;
+			// Force a quick update.
+			RequestImpl64(Addr, pEntry);
 		}
 	}
-	else if(Type == IServerBrowser::SET_DDNET_ADD)
+	else if(pEntry->m_RequestTime > 0)
 	{
-		if(m_ServerlistType != IServerBrowser::TYPE_DDNET)
-			return;
-
-		if(!Find(Addr))
+		if(!pEntry->m_RequestIgnoreInfo)
 		{
-			pEntry = Add(Addr);
-			QueueRequest(pEntry);
-		}
-	}
-	else if(Type == IServerBrowser::SET_KOG_ADD)
-	{
-		if(m_ServerlistType != IServerBrowser::TYPE_KOG)
-			return;
-
-		if(!Find(Addr))
-		{
-			pEntry = Add(Addr);
-			QueueRequest(pEntry);
-		}
-	}
-	else if(Type == IServerBrowser::SET_TOKEN)
-	{
-		int BasicToken = Token;
-		int ExtraToken = 0;
-		if(pInfo->m_Type == SERVERINFO_EXTENDED)
-		{
-			BasicToken = Token & 0xff;
-			ExtraToken = Token >> 8;
+			SetInfo(pEntry, *pInfo);
 		}
 
-		pEntry = Find(Addr);
-
-		if(m_ServerlistType == IServerBrowser::TYPE_LAN)
+		int Latency = minimum(static_cast<int>((time_get() - pEntry->m_RequestTime) * 1000 / time_freq()), 999);
+		if(!pEntry->m_RequestIgnoreInfo)
 		{
-			NETADDR Broadcast;
-			mem_zero(&Broadcast, sizeof(Broadcast));
-			Broadcast.type = m_pNetClient->NetType() | NETTYPE_LINK_BROADCAST;
-			int Token = GenerateToken(Broadcast);
-			bool Drop = false;
-			Drop = Drop || BasicToken != GetBasicToken(Token);
-			Drop = Drop || (pInfo->m_Type == SERVERINFO_EXTENDED && ExtraToken != GetExtraToken(Token));
-			if(Drop)
-			{
-				return;
-			}
-
-			if(!pEntry)
-				pEntry = Add(Addr);
+			pEntry->m_Info.m_Latency = Latency;
 		}
 		else
 		{
-			if(!pEntry)
-			{
-				return;
-			}
-			int Token = GenerateToken(Addr);
-			bool Drop = false;
-			Drop = Drop || BasicToken != GetBasicToken(Token);
-			Drop = Drop || (pInfo->m_Type == SERVERINFO_EXTENDED && ExtraToken != GetExtraToken(Token));
-			if(Drop)
-			{
-				return;
-			}
+			char aAddr[NETADDR_MAXSTRSIZE];
+			net_addr_str(&Addr, aAddr, sizeof(aAddr), true);
+			dbg_msg("serverbrowse/dbg", "received ping response from %s", aAddr);
+			SetLatency(Addr, Latency);
 		}
+		pEntry->m_RequestTime = -1; // Request has been answered
 
-		SetInfo(pEntry, *pInfo);
-		if(m_ServerlistType == IServerBrowser::TYPE_LAN)
-			pEntry->m_Info.m_Latency = minimum(static_cast<int>((time_get() - m_BroadcastTime) * 1000 / time_freq()), 999);
-		else if(pEntry->m_RequestTime > 0)
+		if(!pEntry->m_RequestIgnoreInfo)
 		{
-			pEntry->m_Info.m_Latency = minimum(static_cast<int>((time_get() - pEntry->m_RequestTime) * 1000 / time_freq()), 999);
-			pEntry->m_RequestTime = -1; // Request has been answered
+			if(pInfo->m_Type == SERVERINFO_VANILLA && Is64Player(pInfo))
+			{
+				pEntry->m_Request64Legacy = true;
+				// Force a quick update.
+				RequestImpl64(Addr, pEntry);
+			}
 		}
-		RemoveRequest(pEntry);
 	}
+	RemoveRequest(pEntry);
 
-	Sort();
+	m_SortOnNextUpdate = true;
 }
 
 void CServerBrowser::Refresh(int Type)
 {
-	// clear out everything
-	m_ServerlistHeap.Reset();
-	m_NumServers = 0;
-	m_NumSortedServers = 0;
-	mem_zero(m_aServerlistIp, sizeof(m_aServerlistIp));
-	m_pFirstReqServer = 0;
-	m_pLastReqServer = 0;
-	m_NumRequests = 0;
-	m_CurrentMaxRequests = g_Config.m_BrMaxRequests;
-	m_RequestNumber++;
-
+	bool ServerListTypeChanged = m_ServerlistType != Type;
+	int OldServerListType = m_ServerlistType;
 	m_ServerlistType = Type;
 	secure_random_fill(m_aTokenSeed, sizeof(m_aTokenSeed));
 
+	if(Type == IServerBrowser::TYPE_LAN || (ServerListTypeChanged && OldServerListType == IServerBrowser::TYPE_LAN))
+		CleanUp();
+
 	if(Type == IServerBrowser::TYPE_LAN)
 	{
-		unsigned char Buffer[sizeof(SERVERBROWSE_GETINFO) + 1];
+		unsigned char aBuffer[sizeof(SERVERBROWSE_GETINFO) + 1];
 		CNetChunk Packet;
 		int i;
 
@@ -653,13 +766,13 @@ void CServerBrowser::Refresh(int Type)
 		mem_zero(&Packet, sizeof(Packet));
 		Packet.m_Address.type = m_pNetClient->NetType() | NETTYPE_LINK_BROADCAST;
 		Packet.m_Flags = NETSENDFLAG_CONNLESS | NETSENDFLAG_EXTENDED;
-		Packet.m_DataSize = sizeof(Buffer);
-		Packet.m_pData = Buffer;
+		Packet.m_DataSize = sizeof(aBuffer);
+		Packet.m_pData = aBuffer;
 		mem_zero(&Packet.m_aExtraData, sizeof(Packet.m_aExtraData));
 
 		int Token = GenerateToken(Packet.m_Address);
-		mem_copy(Buffer, SERVERBROWSE_GETINFO, sizeof(SERVERBROWSE_GETINFO));
-		Buffer[sizeof(SERVERBROWSE_GETINFO)] = GetBasicToken(Token);
+		mem_copy(aBuffer, SERVERBROWSE_GETINFO, sizeof(SERVERBROWSE_GETINFO));
+		aBuffer[sizeof(SERVERBROWSE_GETINFO)] = GetBasicToken(Token);
 
 		Packet.m_aExtraData[0] = GetExtraToken(Token) >> 8;
 		Packet.m_aExtraData[1] = GetExtraToken(Token) & 0xff;
@@ -675,80 +788,24 @@ void CServerBrowser::Refresh(int Type)
 		if(g_Config.m_Debug)
 			m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "client_srvbrowse", "broadcasting for servers");
 	}
-	else if(Type == IServerBrowser::TYPE_INTERNET)
-		m_NeedRefresh = 1;
-	else if(Type == IServerBrowser::TYPE_FAVORITES)
+	else if(Type == IServerBrowser::TYPE_FAVORITES || Type == IServerBrowser::TYPE_INTERNET || Type == IServerBrowser::TYPE_DDNET || Type == IServerBrowser::TYPE_KOG)
 	{
-		for(int i = 0; i < m_NumFavoriteServers; i++)
-			Set(m_aFavoriteServers[i], IServerBrowser::SET_FAV_ADD, -1, 0);
-	}
-	else if(Type == IServerBrowser::TYPE_DDNET)
-	{
-		// remove unknown elements of exclude list
-		CountryFilterClean(NETWORK_DDNET);
-		TypeFilterClean(NETWORK_DDNET);
+		m_pHttp->Refresh();
+		m_pPingCache->Load();
+		m_RefreshingHttp = true;
 
-		int MaxServers = 0;
-		for(int i = 0; i < m_aNetworks[NETWORK_DDNET].m_NumCountries; i++)
+		if(ServerListTypeChanged && m_pHttp->NumServers() > 0)
 		{
-			CNetworkCountry *pCntr = &m_aNetworks[NETWORK_DDNET].m_aCountries[i];
-			MaxServers = maximum(MaxServers, pCntr->m_NumServers);
-		}
-
-		for(int g = 0; g < MaxServers; g++)
-		{
-			for(int i = 0; i < m_aNetworks[NETWORK_DDNET].m_NumCountries; i++)
-			{
-				CNetworkCountry *pCntr = &m_aNetworks[NETWORK_DDNET].m_aCountries[i];
-
-				// check for filter
-				if(DDNetFiltered(g_Config.m_BrFilterExcludeCountries, pCntr->m_aName))
-					continue;
-
-				if(g >= pCntr->m_NumServers)
-					continue;
-
-				if(!DDNetFiltered(g_Config.m_BrFilterExcludeTypes, pCntr->m_aTypes[g]))
-					Set(pCntr->m_aServers[g], IServerBrowser::SET_DDNET_ADD, -1, 0);
-			}
-		}
-	}
-	else if(Type == IServerBrowser::TYPE_KOG)
-	{
-		// remove unknown elements of exclude list
-		CountryFilterClean(NETWORK_KOG);
-		TypeFilterClean(NETWORK_KOG);
-
-		int MaxServers = 0;
-		for(int i = 0; i < m_aNetworks[NETWORK_KOG].m_NumCountries; i++)
-		{
-			CNetworkCountry *pCntr = &m_aNetworks[NETWORK_KOG].m_aCountries[i];
-			MaxServers = maximum(MaxServers, pCntr->m_NumServers);
-		}
-
-		for(int g = 0; g < MaxServers; g++)
-		{
-			for(int i = 0; i < m_aNetworks[NETWORK_KOG].m_NumCountries; i++)
-			{
-				CNetworkCountry *pCntr = &m_aNetworks[NETWORK_KOG].m_aCountries[i];
-
-				// check for filter
-				if(DDNetFiltered(g_Config.m_BrFilterExcludeCountriesKoG, pCntr->m_aName))
-					continue;
-
-				if(g >= pCntr->m_NumServers)
-					continue;
-
-				if(!DDNetFiltered(g_Config.m_BrFilterExcludeTypesKoG, pCntr->m_aTypes[g]))
-					Set(pCntr->m_aServers[g], IServerBrowser::SET_KOG_ADD, -1, 0);
-			}
+			CleanUp();
+			UpdateFromHttp();
+			Sort();
 		}
 	}
 }
 
-void CServerBrowser::RequestImpl(const NETADDR &Addr, CServerEntry *pEntry) const
+void CServerBrowser::RequestImpl(const NETADDR &Addr, CServerEntry *pEntry, int *pBasicToken, int *pToken, bool RandomToken) const
 {
-	unsigned char Buffer[sizeof(SERVERBROWSE_GETINFO) + 1];
+	unsigned char aBuffer[sizeof(SERVERBROWSE_GETINFO) + 1];
 	CNetChunk Packet;
 
 	if(g_Config.m_Debug)
@@ -761,15 +818,32 @@ void CServerBrowser::RequestImpl(const NETADDR &Addr, CServerEntry *pEntry) cons
 	}
 
 	int Token = GenerateToken(Addr);
+	if(RandomToken)
+	{
+		int AvoidBasicToken = GetBasicToken(Token);
+		do
+		{
+			secure_random_fill(&Token, sizeof(Token));
+			Token &= 0xffffff;
+		} while(GetBasicToken(Token) == AvoidBasicToken);
+	}
+	if(pToken)
+	{
+		*pToken = Token;
+	}
+	if(pBasicToken)
+	{
+		*pBasicToken = GetBasicToken(Token);
+	}
 
-	mem_copy(Buffer, SERVERBROWSE_GETINFO, sizeof(SERVERBROWSE_GETINFO));
-	Buffer[sizeof(SERVERBROWSE_GETINFO)] = GetBasicToken(Token);
+	mem_copy(aBuffer, SERVERBROWSE_GETINFO, sizeof(SERVERBROWSE_GETINFO));
+	aBuffer[sizeof(SERVERBROWSE_GETINFO)] = GetBasicToken(Token);
 
 	Packet.m_ClientID = -1;
 	Packet.m_Address = Addr;
 	Packet.m_Flags = NETSENDFLAG_CONNLESS | NETSENDFLAG_EXTENDED;
-	Packet.m_DataSize = sizeof(Buffer);
-	Packet.m_pData = Buffer;
+	Packet.m_DataSize = sizeof(aBuffer);
+	Packet.m_pData = aBuffer;
 	mem_zero(&Packet.m_aExtraData, sizeof(Packet.m_aExtraData));
 	Packet.m_aExtraData[0] = GetExtraToken(Token) >> 8;
 	Packet.m_aExtraData[1] = GetExtraToken(Token) & 0xff;
@@ -782,7 +856,7 @@ void CServerBrowser::RequestImpl(const NETADDR &Addr, CServerEntry *pEntry) cons
 
 void CServerBrowser::RequestImpl64(const NETADDR &Addr, CServerEntry *pEntry) const
 {
-	unsigned char Buffer[sizeof(SERVERBROWSE_GETINFO_64_LEGACY) + 1];
+	unsigned char aBuffer[sizeof(SERVERBROWSE_GETINFO_64_LEGACY) + 1];
 	CNetChunk Packet;
 
 	if(g_Config.m_Debug)
@@ -794,14 +868,14 @@ void CServerBrowser::RequestImpl64(const NETADDR &Addr, CServerEntry *pEntry) co
 		m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "client_srvbrowse", aBuf);
 	}
 
-	mem_copy(Buffer, SERVERBROWSE_GETINFO_64_LEGACY, sizeof(SERVERBROWSE_GETINFO_64_LEGACY));
-	Buffer[sizeof(SERVERBROWSE_GETINFO_64_LEGACY)] = GetBasicToken(GenerateToken(Addr));
+	mem_copy(aBuffer, SERVERBROWSE_GETINFO_64_LEGACY, sizeof(SERVERBROWSE_GETINFO_64_LEGACY));
+	aBuffer[sizeof(SERVERBROWSE_GETINFO_64_LEGACY)] = GetBasicToken(GenerateToken(Addr));
 
 	Packet.m_ClientID = -1;
 	Packet.m_Address = Addr;
 	Packet.m_Flags = NETSENDFLAG_CONNLESS;
-	Packet.m_DataSize = sizeof(Buffer);
-	Packet.m_pData = Buffer;
+	Packet.m_DataSize = sizeof(aBuffer);
+	Packet.m_pData = aBuffer;
 
 	m_pNetClient->Send(&Packet);
 
@@ -811,123 +885,212 @@ void CServerBrowser::RequestImpl64(const NETADDR &Addr, CServerEntry *pEntry) co
 
 void CServerBrowser::RequestCurrentServer(const NETADDR &Addr) const
 {
-	RequestImpl(Addr, 0);
+	RequestImpl(Addr, nullptr, nullptr, nullptr, false);
+}
+
+void CServerBrowser::RequestCurrentServerWithRandomToken(const NETADDR &Addr, int *pBasicToken, int *pToken) const
+{
+	RequestImpl(Addr, nullptr, pBasicToken, pToken, true);
+}
+
+void CServerBrowser::SetCurrentServerPing(const NETADDR &Addr, int Ping)
+{
+	SetLatency(Addr, minimum(Ping, 999));
+}
+
+void CServerBrowser::UpdateFromHttp()
+{
+	int OwnLocation;
+	if(str_comp(g_Config.m_BrLocation, "auto") == 0)
+	{
+		OwnLocation = m_OwnLocation;
+	}
+	else
+	{
+		if(CServerInfo::ParseLocation(&OwnLocation, g_Config.m_BrLocation))
+		{
+			char aBuf[64];
+			str_format(aBuf, sizeof(aBuf), "cannot parse br_location: '%s'", g_Config.m_BrLocation);
+			m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "serverbrowse", aBuf);
+		}
+	}
+
+	int NumServers = m_pHttp->NumServers();
+	int NumLegacyServers = m_pHttp->NumLegacyServers();
+	std::unordered_set<NETADDR> WantedAddrs;
+	std::function<bool(const NETADDR *, int)> Want = [](const NETADDR *pAddrs, int NumAddrs) { return true; };
+	if(m_ServerlistType != IServerBrowser::TYPE_INTERNET)
+	{
+		if(m_ServerlistType == IServerBrowser::TYPE_FAVORITES)
+		{
+			Want = [&](const NETADDR *pAddrs, int NumAddrs) -> bool { return m_pFavorites->IsFavorite(pAddrs, NumAddrs) != TRISTATE::NONE; };
+		}
+		else
+		{
+			int Network;
+			char *pExcludeCountries;
+			char *pExcludeTypes;
+			switch(m_ServerlistType)
+			{
+			case IServerBrowser::TYPE_DDNET:
+				Network = NETWORK_DDNET;
+				pExcludeCountries = g_Config.m_BrFilterExcludeCountries;
+				pExcludeTypes = g_Config.m_BrFilterExcludeTypes;
+				break;
+			case IServerBrowser::TYPE_KOG:
+				Network = NETWORK_KOG;
+				pExcludeCountries = g_Config.m_BrFilterExcludeCountriesKoG;
+				pExcludeTypes = g_Config.m_BrFilterExcludeTypesKoG;
+				break;
+			default:
+				dbg_assert(0, "invalid network");
+				return;
+			}
+			// remove unknown elements of exclude list
+			CountryFilterClean(Network);
+			TypeFilterClean(Network);
+
+			int MaxServers = 0;
+			for(int i = 0; i < m_aNetworks[Network].m_NumCountries; i++)
+			{
+				CNetworkCountry *pCntr = &m_aNetworks[Network].m_aCountries[i];
+				MaxServers = maximum(MaxServers, pCntr->m_NumServers);
+			}
+
+			for(int g = 0; g < MaxServers; g++)
+			{
+				for(int i = 0; i < m_aNetworks[Network].m_NumCountries; i++)
+				{
+					CNetworkCountry *pCntr = &m_aNetworks[Network].m_aCountries[i];
+
+					// check for filter
+					if(DDNetFiltered(pExcludeCountries, pCntr->m_aName))
+						continue;
+
+					if(g >= pCntr->m_NumServers)
+						continue;
+
+					if(DDNetFiltered(pExcludeTypes, pCntr->m_aTypes[g]))
+						continue;
+					WantedAddrs.insert(pCntr->m_aServers[g]);
+				}
+			}
+			Want = [&](const NETADDR *pAddrs, int NumAddrs) -> bool {
+				for(int i = 0; i < NumAddrs; i++)
+				{
+					if(WantedAddrs.count(pAddrs[i]))
+					{
+						return true;
+					}
+				}
+				return false;
+			};
+		}
+	}
+	for(int i = 0; i < NumServers; i++)
+	{
+		CServerInfo Info = m_pHttp->Server(i);
+		if(!Want(Info.m_aAddresses, Info.m_NumAddresses))
+		{
+			continue;
+		}
+		int Ping = m_pPingCache->GetPing(Info.m_aAddresses, Info.m_NumAddresses);
+		Info.m_LatencyIsEstimated = Ping == -1;
+		if(Info.m_LatencyIsEstimated)
+		{
+			Info.m_Latency = CServerInfo::EstimateLatency(OwnLocation, Info.m_Location);
+		}
+		else
+		{
+			Info.m_Latency = Ping;
+		}
+		Info.m_HasRank = HasRank(Info.m_aMap);
+		CServerEntry *pEntry = Add(Info.m_aAddresses, Info.m_NumAddresses);
+		SetInfo(pEntry, Info);
+		pEntry->m_RequestIgnoreInfo = true;
+	}
+	for(int i = 0; i < NumLegacyServers; i++)
+	{
+		NETADDR Addr = m_pHttp->LegacyServer(i);
+		if(!Want(&Addr, 1))
+		{
+			continue;
+		}
+		QueueRequest(Add(&Addr, 1));
+	}
+
+	if(m_ServerlistType == IServerBrowser::TYPE_FAVORITES)
+	{
+		const IFavorites::CEntry *pFavorites;
+		int NumFavorites;
+		m_pFavorites->AllEntries(&pFavorites, &NumFavorites);
+		for(int i = 0; i < NumFavorites; i++)
+		{
+			bool Found = false;
+			for(int j = 0; j < pFavorites[i].m_NumAddrs; j++)
+			{
+				if(Find(pFavorites[i].m_aAddrs[j]))
+				{
+					Found = true;
+					break;
+				}
+			}
+			if(Found)
+			{
+				continue;
+			}
+			// (Also add favorites we're not allowed to ping.)
+			CServerEntry *pEntry = Add(pFavorites[i].m_aAddrs, pFavorites[i].m_NumAddrs);
+			if(pFavorites->m_AllowPing)
+			{
+				QueueRequest(pEntry);
+			}
+		}
+	}
+
+	m_SortOnNextUpdate = true;
+}
+
+void CServerBrowser::CleanUp()
+{
+	// clear out everything
+	m_ServerlistHeap.Reset();
+	m_NumServers = 0;
+	m_NumSortedServers = 0;
+	m_ByAddr.clear();
+	m_pFirstReqServer = 0;
+	m_pLastReqServer = 0;
+	m_NumRequests = 0;
+	m_CurrentMaxRequests = g_Config.m_BrMaxRequests;
 }
 
 void CServerBrowser::Update(bool ForceResort)
 {
-	int64 Timeout = time_freq();
-	int64 Now = time_get();
-	int Count;
-	CServerEntry *pEntry, *pNext;
+	int64_t Timeout = time_freq();
+	int64_t Now = time_get();
 
-	// do server list requests
-	if(m_NeedRefresh && !m_pMasterServer->IsRefreshing())
+	const char *pHttpBestUrl;
+	if(!m_pHttp->GetBestUrl(&pHttpBestUrl) && pHttpBestUrl != m_pHttpPrevBestUrl)
 	{
-		NETADDR Addr;
-		CNetChunk Packet;
-		int i = 0;
-
-		m_NeedRefresh = 0;
-		m_MasterServerCount = -1;
-		mem_zero(&Packet, sizeof(Packet));
-		Packet.m_ClientID = -1;
-		Packet.m_Flags = NETSENDFLAG_CONNLESS;
-		Packet.m_DataSize = sizeof(SERVERBROWSE_GETCOUNT);
-		Packet.m_pData = SERVERBROWSE_GETCOUNT;
-
-		for(i = 0; i < IMasterServer::MAX_MASTERSERVERS; i++)
-		{
-			if(!m_pMasterServer->IsValid(i))
-				continue;
-
-			Addr = m_pMasterServer->GetAddr(i);
-			m_pMasterServer->SetCount(i, -1);
-			Packet.m_Address = Addr;
-			m_pNetClient->Send(&Packet);
-			if(g_Config.m_Debug)
-			{
-				dbg_msg("client_srvbrowse", "count-request sent to %d", i);
-			}
-		}
+		str_copy(g_Config.m_BrCachedBestServerinfoUrl, pHttpBestUrl);
+		m_pHttpPrevBestUrl = pHttpBestUrl;
 	}
 
-	//Check if all server counts arrived
-	if(m_MasterServerCount == -1)
-	{
-		m_MasterServerCount = 0;
-		for(int i = 0; i < IMasterServer::MAX_MASTERSERVERS; i++)
-		{
-			if(!m_pMasterServer->IsValid(i))
-				continue;
-			int Count = m_pMasterServer->GetCount(i);
-			if(Count == -1)
-			{
-				/* ignore Server
-					m_MasterServerCount = -1;
-					return;
-					// we don't have the required server information
-					*/
-			}
-			else
-				m_MasterServerCount += Count;
-		}
-		//request Server-List
-		NETADDR Addr;
-		CNetChunk Packet;
-		mem_zero(&Packet, sizeof(Packet));
-		Packet.m_ClientID = -1;
-		Packet.m_Flags = NETSENDFLAG_CONNLESS;
-		Packet.m_DataSize = sizeof(SERVERBROWSE_GETLIST);
-		Packet.m_pData = SERVERBROWSE_GETLIST;
+	m_pHttp->Update();
 
-		for(int i = 0; i < IMasterServer::MAX_MASTERSERVERS; i++)
-		{
-			if(!m_pMasterServer->IsValid(i))
-				continue;
+	if(m_ServerlistType != TYPE_LAN && m_RefreshingHttp && !m_pHttp->IsRefreshing())
+	{
+		m_RefreshingHttp = false;
+		CleanUp();
+		UpdateFromHttp();
+		// TODO: move this somewhere else
+		Sort();
+		return;
+	}
 
-			Addr = m_pMasterServer->GetAddr(i);
-			Packet.m_Address = Addr;
-			m_pNetClient->Send(&Packet);
-		}
-		if(g_Config.m_Debug)
-		{
-			dbg_msg("client_srvbrowse", "servercount: %d, requesting server list", m_MasterServerCount);
-		}
-		m_LastPacketTick = 0;
-	}
-	else if(m_MasterServerCount > -1)
-	{
-		m_MasterServerCount = 0;
-		for(int i = 0; i < IMasterServer::MAX_MASTERSERVERS; i++)
-		{
-			if(!m_pMasterServer->IsValid(i))
-				continue;
-			int Count = m_pMasterServer->GetCount(i);
-			if(Count == -1)
-			{
-				/* ignore Server
-					m_MasterServerCount = -1;
-					return;
-					// we don't have the required server information
-					*/
-			}
-			else
-				m_MasterServerCount += Count;
-		}
-		//if(g_Config.m_Debug)
-		//{
-		//	dbg_msg("client_srvbrowse", "ServerCount2: %d", m_MasterServerCount);
-		//}
-	}
-	if(m_MasterServerCount > m_NumRequests + m_LastPacketTick)
-	{
-		++m_LastPacketTick;
-		return; //wait for more packets
-	}
-	pEntry = m_pFirstReqServer;
-	Count = 0;
-	while(1)
+	CServerEntry *pEntry = m_pFirstReqServer;
+	int Count = 0;
+	while(true)
 	{
 		if(!pEntry) // no more entries
 			break;
@@ -943,9 +1106,9 @@ void CServerBrowser::Update(bool ForceResort)
 		if(pEntry->m_RequestTime == 0)
 		{
 			if(pEntry->m_Request64Legacy)
-				RequestImpl64(pEntry->m_Addr, pEntry);
+				RequestImpl64(pEntry->m_Info.m_aAddresses[0], pEntry);
 			else
-				RequestImpl(pEntry->m_Addr, pEntry);
+				RequestImpl(pEntry->m_Info.m_aAddresses[0], pEntry, nullptr, nullptr, false);
 		}
 
 		Count++;
@@ -956,7 +1119,7 @@ void CServerBrowser::Update(bool ForceResort)
 	{
 		//reset old ones
 		pEntry = m_pFirstReqServer;
-		while(1)
+		while(true)
 		{
 			if(!pEntry) // no more entries
 				break;
@@ -972,81 +1135,27 @@ void CServerBrowser::Update(bool ForceResort)
 	else if(Count == 0 && m_CurrentMaxRequests == 1) //we reached the limit, just release all left requests. IF a server sends us a packet, a new request will be added automatically, so we can delete all
 	{
 		pEntry = m_pFirstReqServer;
-		while(1)
+		while(true)
 		{
 			if(!pEntry) // no more entries
 				break;
-			pNext = pEntry->m_pNextReq;
+			CServerEntry *pNext = pEntry->m_pNextReq;
 			RemoveRequest(pEntry); //release request
 			pEntry = pNext;
 		}
 	}
 
 	// check if we need to resort
-	if(m_Sorthash != SortHash() || ForceResort)
-		Sort();
-}
-
-bool CServerBrowser::IsFavorite(const NETADDR &Addr) const
-{
-	// search for the address
-	int i;
-	for(i = 0; i < m_NumFavoriteServers; i++)
+	if(m_Sorthash != SortHash() || ForceResort || m_SortOnNextUpdate)
 	{
-		if(net_addr_comp(&Addr, &m_aFavoriteServers[i]) == 0)
-			return true;
-	}
-	return false;
-}
-
-void CServerBrowser::AddFavorite(const NETADDR &Addr)
-{
-	CServerEntry *pEntry;
-
-	if(m_NumFavoriteServers == MAX_FAVORITES)
-		return;
-
-	// make sure that we don't already have the server in our list
-	for(int i = 0; i < m_NumFavoriteServers; i++)
-	{
-		if(net_addr_comp(&Addr, &m_aFavoriteServers[i]) == 0)
-			return;
-	}
-
-	// add the server to the list
-	m_aFavoriteServers[m_NumFavoriteServers++] = Addr;
-	pEntry = Find(Addr);
-	if(pEntry)
-		pEntry->m_Info.m_Favorite = true;
-
-	if(g_Config.m_Debug)
-	{
-		char aAddrStr[NETADDR_MAXSTRSIZE];
-		net_addr_str(&Addr, aAddrStr, sizeof(aAddrStr), true);
-		char aBuf[256];
-		str_format(aBuf, sizeof(aBuf), "added fav, %s", aAddrStr);
-		m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "client_srvbrowse", aBuf);
-	}
-}
-
-void CServerBrowser::RemoveFavorite(const NETADDR &Addr)
-{
-	int i;
-	CServerEntry *pEntry;
-
-	for(i = 0; i < m_NumFavoriteServers; i++)
-	{
-		if(net_addr_comp(&Addr, &m_aFavoriteServers[i]) == 0)
+		for(int i = 0; i < m_NumServers; i++)
 		{
-			mem_move(&m_aFavoriteServers[i], &m_aFavoriteServers[i + 1], sizeof(NETADDR) * (m_NumFavoriteServers - (i + 1)));
-			m_NumFavoriteServers--;
-
-			pEntry = Find(Addr);
-			if(pEntry)
-				pEntry->m_Info.m_Favorite = false;
-
-			return;
+			CServerInfo *pInfo = &m_ppServerlist[i]->m_Info;
+			pInfo->m_Favorite = m_pFavorites->IsFavorite(pInfo->m_aAddresses, pInfo->m_NumAddresses);
+			pInfo->m_FavoriteAllowPing = m_pFavorites->IsPingAllowed(pInfo->m_aAddresses, pInfo->m_NumAddresses);
 		}
+		Sort();
+		m_SortOnNextUpdate = false;
 	}
 }
 
@@ -1088,7 +1197,7 @@ void CServerBrowser::LoadDDNetServers()
 
 			pCntr->Reset();
 
-			str_copy(pCntr->m_aName, json_string_get(pName), sizeof(pCntr->m_aName));
+			str_copy(pCntr->m_aName, json_string_get(pName));
 			pCntr->m_FlagID = json_int_get(pFlagID);
 
 			// add country
@@ -1114,7 +1223,7 @@ void CServerBrowser::LoadDDNetServers()
 					}
 					if(Pos == pNet->m_NumTypes)
 					{
-						str_copy(pNet->m_aTypes[pNet->m_NumTypes], pType, sizeof(pNet->m_aTypes[pNet->m_NumTypes]));
+						str_copy(pNet->m_aTypes[pNet->m_NumTypes], pType);
 						pNet->m_NumTypes++;
 					}
 				}
@@ -1130,7 +1239,7 @@ void CServerBrowser::LoadDDNetServers()
 					}
 					const char *pStr = json_string_get(pAddr);
 					net_addr_from_str(&pCntr->m_aServers[pCntr->m_NumServers], pStr);
-					str_copy(pCntr->m_aTypes[pCntr->m_NumServers], pType, sizeof(pCntr->m_aTypes[pCntr->m_NumServers]));
+					str_copy(pCntr->m_aTypes[pCntr->m_NumServers], pType);
 				}
 			}
 
@@ -1141,11 +1250,11 @@ void CServerBrowser::LoadDDNetServers()
 
 void CServerBrowser::RecheckOfficial()
 {
-	for(int Network = 0; Network < NUM_NETWORKS; Network++)
+	for(auto &Network : m_aNetworks)
 	{
-		for(int i = 0; i < m_aNetworks[Network].m_NumCountries; i++)
+		for(int i = 0; i < Network.m_NumCountries; i++)
 		{
-			CNetworkCountry *pCntr = &m_aNetworks[Network].m_aCountries[i];
+			CNetworkCountry *pCntr = &Network.m_aCountries[i];
 			for(int j = 0; j < pCntr->m_NumServers; j++)
 			{
 				CServerEntry *pEntry = Find(pCntr->m_aServers[j]);
@@ -1194,29 +1303,14 @@ int CServerBrowser::HasRank(const char *pMap)
 
 void CServerBrowser::LoadDDNetInfoJson()
 {
-	IStorage *pStorage = Kernel()->RequestInterface<IStorage>();
-	IOHANDLE File = pStorage->OpenFile(DDNET_INFO, IOFLAG_READ, IStorage::TYPE_SAVE);
-
-	if(!File)
+	void *pBuf;
+	unsigned Length;
+	if(!m_pStorage->ReadFile(DDNET_INFO, IStorage::TYPE_SAVE, &pBuf, &Length))
 		return;
 
-	const int Length = io_length(File);
-	if(Length <= 0)
-	{
-		io_close(File);
-		return;
-	}
+	json_value_free(m_pDDNetInfo);
 
-	char *pBuf = (char *)malloc(Length);
-	pBuf[0] = '\0';
-
-	io_read(File, pBuf, Length);
-	io_close(File);
-
-	if(m_pDDNetInfo)
-		json_value_free(m_pDDNetInfo);
-
-	m_pDDNetInfo = json_parse(pBuf, Length);
+	m_pDDNetInfo = json_parse((json_char *)pBuf, Length);
 
 	free(pBuf);
 
@@ -1225,6 +1319,50 @@ void CServerBrowser::LoadDDNetInfoJson()
 		json_value_free(m_pDDNetInfo);
 		m_pDDNetInfo = 0;
 	}
+
+	m_OwnLocation = CServerInfo::LOC_UNKNOWN;
+	if(m_pDDNetInfo)
+	{
+		const json_value &Location = (*m_pDDNetInfo)["location"];
+		if(Location.type != json_string || CServerInfo::ParseLocation(&m_OwnLocation, Location))
+		{
+			char aBuf[64];
+			str_format(aBuf, sizeof(aBuf), "cannot parse location from info.json: '%s'", (const char *)Location);
+			m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "serverbrowse", aBuf);
+		}
+	}
+}
+
+const char *CServerBrowser::GetTutorialServer()
+{
+	// Use DDNet tab as default after joining tutorial, also makes sure Find() actually works
+	// Note that when no server info has been loaded yet, this will not return a result immediately.
+	g_Config.m_UiPage = CMenus::PAGE_DDNET;
+	Refresh(IServerBrowser::TYPE_DDNET);
+
+	CNetwork *pNetwork = &m_aNetworks[NETWORK_DDNET];
+	const char *pBestAddr = nullptr;
+	int BestLatency = std::numeric_limits<int>::max();
+
+	for(int i = 0; i < pNetwork->m_NumCountries; i++)
+	{
+		CNetworkCountry *pCntr = &pNetwork->m_aCountries[i];
+		for(int j = 0; j < pCntr->m_NumServers; j++)
+		{
+			CServerEntry *pEntry = Find(pCntr->m_aServers[j]);
+			if(!pEntry)
+				continue;
+			if(str_find(pEntry->m_Info.m_aName, "(Tutorial)") == 0)
+				continue;
+			if(pEntry->m_Info.m_NumPlayers > pEntry->m_Info.m_MaxPlayers - 10)
+				continue;
+			if(pEntry->m_Info.m_Latency >= BestLatency)
+				continue;
+			BestLatency = pEntry->m_Info.m_Latency;
+			pBestAddr = pEntry->m_Info.m_aAddress;
+		}
+	}
+	return pBestAddr;
 }
 
 const json_value *CServerBrowser::LoadDDNetInfo()
@@ -1232,15 +1370,8 @@ const json_value *CServerBrowser::LoadDDNetInfo()
 	LoadDDNetInfoJson();
 	LoadDDNetServers();
 
-	if(m_NumServers == 0)
-	{
-		Refresh(m_ServerlistType);
-	}
-	else
-	{
-		RecheckOfficial();
-		LoadDDNetRanks();
-	}
+	RecheckOfficial();
+	LoadDDNetRanks();
 
 	return m_pDDNetInfo;
 }
@@ -1250,9 +1381,9 @@ bool CServerBrowser::IsRefreshing() const
 	return m_pFirstReqServer != 0;
 }
 
-bool CServerBrowser::IsRefreshingMasters() const
+bool CServerBrowser::IsGettingServerlist() const
 {
-	return m_pMasterServer->IsRefreshing();
+	return m_pHttp->IsRefreshing();
 }
 
 int CServerBrowser::LoadingProgression() const
@@ -1263,20 +1394,6 @@ int CServerBrowser::LoadingProgression() const
 	int Servers = m_NumServers;
 	int Loaded = m_NumServers - m_NumRequests;
 	return 100.0f * Loaded / Servers;
-}
-
-void CServerBrowser::ConfigSaveCallback(IConfig *pConfig, void *pUserData)
-{
-	CServerBrowser *pSelf = (CServerBrowser *)pUserData;
-
-	char aAddrStr[128];
-	char aBuffer[256];
-	for(int i = 0; i < pSelf->m_NumFavoriteServers; i++)
-	{
-		net_addr_str(&pSelf->m_aFavoriteServers[i], aAddrStr, sizeof(aAddrStr), true);
-		str_format(aBuffer, sizeof(aBuffer), "add_favorite %s", aAddrStr);
-		pConfig->WriteLine(aBuffer);
-	}
 }
 
 void CServerBrowser::DDNetFilterAdd(char *pFilter, const char *pName)
@@ -1297,11 +1414,11 @@ void CServerBrowser::DDNetFilterRem(char *pFilter, const char *pName)
 	// rewrite exclude/filter list
 	char aBuf[128];
 
-	str_copy(aBuf, pFilter, sizeof(aBuf));
+	str_copy(aBuf, pFilter);
 	pFilter[0] = '\0';
 
 	char aToken[128];
-	for(const char *tok = aBuf; (tok = str_next_token(tok, ",", aToken, sizeof(aToken)));)
+	for(const char *pTok = aBuf; (pTok = str_next_token(pTok, ",", aToken, sizeof(aToken)));)
 	{
 		if(str_comp_nocase(pName, aToken) != 0)
 		{
@@ -1323,11 +1440,11 @@ void CServerBrowser::CountryFilterClean(int Network)
 	char aNewList[128];
 	aNewList[0] = '\0';
 
-	for(int Network = 0; Network < NUM_NETWORKS; Network++)
+	for(auto &Net : m_aNetworks)
 	{
-		for(int i = 0; i < m_aNetworks[Network].m_NumCountries; i++)
+		for(int i = 0; i < Net.m_NumCountries; i++)
 		{
-			const char *pName = m_aNetworks[Network].m_aCountries[i].m_aName;
+			const char *pName = Net.m_aCountries[i].m_aName;
 			if(DDNetFiltered(pExcludeCountries, pName))
 			{
 				char aBuf[128];
@@ -1358,4 +1475,114 @@ void CServerBrowser::TypeFilterClean(int Network)
 	}
 
 	str_copy(pExcludeTypes, aNewList, sizeof(g_Config.m_BrFilterExcludeTypes));
+}
+
+int CServerInfo::EstimateLatency(int Loc1, int Loc2)
+{
+	if(Loc1 == LOC_UNKNOWN || Loc2 == LOC_UNKNOWN)
+	{
+		return 999;
+	}
+	if(Loc1 != Loc2)
+	{
+		return 199;
+	}
+	return 99;
+}
+bool CServerInfo::ParseLocation(int *pResult, const char *pString)
+{
+	*pResult = LOC_UNKNOWN;
+	int Length = str_length(pString);
+	if(Length < 2)
+	{
+		return true;
+	}
+	// ISO continent code. Allow antarctica, but treat it as unknown.
+	static const char s_apLocations[][6] = {
+		"an", // LOC_UNKNOWN
+		"af", // LOC_AFRICA
+		"as", // LOC_ASIA
+		"oc", // LOC_AUSTRALIA
+		"eu", // LOC_EUROPE
+		"na", // LOC_NORTH_AMERICA
+		"sa", // LOC_SOUTH_AMERICA
+		"as:cn", // LOC_CHINA
+	};
+	for(int i = std::size(s_apLocations) - 1; i >= 0; i--)
+	{
+		if(str_startswith(pString, s_apLocations[i]))
+		{
+			*pResult = i;
+			return false;
+		}
+	}
+	return true;
+}
+
+bool IsVanilla(const CServerInfo *pInfo)
+{
+	return !str_comp(pInfo->m_aGameType, "DM") || !str_comp(pInfo->m_aGameType, "TDM") || !str_comp(pInfo->m_aGameType, "CTF");
+}
+
+bool IsCatch(const CServerInfo *pInfo)
+{
+	return str_find_nocase(pInfo->m_aGameType, "catch");
+}
+
+bool IsInsta(const CServerInfo *pInfo)
+{
+	return str_find_nocase(pInfo->m_aGameType, "idm") || str_find_nocase(pInfo->m_aGameType, "itdm") || str_find_nocase(pInfo->m_aGameType, "ictf");
+}
+
+bool IsFNG(const CServerInfo *pInfo)
+{
+	return str_find_nocase(pInfo->m_aGameType, "fng");
+}
+
+bool IsRace(const CServerInfo *pInfo)
+{
+	return str_find_nocase(pInfo->m_aGameType, "race") || str_find_nocase(pInfo->m_aGameType, "fastcap");
+}
+
+bool IsFastCap(const CServerInfo *pInfo)
+{
+	return str_find_nocase(pInfo->m_aGameType, "fastcap");
+}
+
+bool IsBlockInfectionZ(const CServerInfo *pInfo)
+{
+	return str_find_nocase(pInfo->m_aGameType, "blockz") ||
+	       str_find_nocase(pInfo->m_aGameType, "infectionz");
+}
+
+bool IsBlockWorlds(const CServerInfo *pInfo)
+{
+	return (str_startswith(pInfo->m_aGameType, "bw  ")) || (str_comp_nocase(pInfo->m_aGameType, "bw") == 0);
+}
+
+bool IsCity(const CServerInfo *pInfo)
+{
+	return str_find_nocase(pInfo->m_aGameType, "city");
+}
+
+bool IsDDRace(const CServerInfo *pInfo)
+{
+	return str_find_nocase(pInfo->m_aGameType, "ddrace") || str_find_nocase(pInfo->m_aGameType, "mkrace");
+}
+
+bool IsDDNet(const CServerInfo *pInfo)
+{
+	return str_find_nocase(pInfo->m_aGameType, "ddracenet") || str_find_nocase(pInfo->m_aGameType, "ddnet");
+}
+
+// other
+
+bool Is64Player(const CServerInfo *pInfo)
+{
+	return str_find(pInfo->m_aGameType, "64") || str_find(pInfo->m_aName, "64") || IsDDNet(pInfo);
+}
+
+bool IsPlus(const CServerInfo *pInfo)
+{
+	return str_find(pInfo->m_aGameType, "+");
 }

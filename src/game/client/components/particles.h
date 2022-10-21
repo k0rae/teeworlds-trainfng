@@ -14,12 +14,16 @@ struct CParticle
 		m_LifeSpan = 0;
 		m_StartSize = 32;
 		m_EndSize = 32;
+		m_UseAlphaFading = false;
+		m_StartAlpha = 1;
+		m_EndAlpha = 1;
 		m_Rot = 0;
 		m_Rotspeed = 0;
 		m_Gravity = 0;
 		m_Friction = 0;
 		m_FlowAffected = 1.0f;
 		m_Color = ColorRGBA(1, 1, 1, 1);
+		m_Collides = true;
 	}
 
 	vec2 m_Pos;
@@ -34,6 +38,10 @@ struct CParticle
 	float m_StartSize;
 	float m_EndSize;
 
+	bool m_UseAlphaFading;
+	float m_StartAlpha;
+	float m_EndAlpha;
+
 	float m_Rot;
 	float m_Rotspeed;
 
@@ -41,6 +49,8 @@ struct CParticle
 	float m_Friction;
 
 	ColorRGBA m_Color;
+
+	bool m_Collides;
 
 	// set by the particle system
 	float m_Life;
@@ -57,20 +67,23 @@ public:
 	{
 		GROUP_PROJECTILE_TRAIL = 0,
 		GROUP_EXPLOSIONS,
+		GROUP_EXTRA,
 		GROUP_GENERAL,
 		NUM_GROUPS
 	};
 
 	CParticles();
+	virtual int Sizeof() const override { return sizeof(*this); }
 
 	void Add(int Group, CParticle *pPart, float TimePassed = 0.f);
 
-	virtual void OnReset();
-	virtual void OnRender();
-	virtual void OnInit();
+	virtual void OnReset() override;
+	virtual void OnRender() override;
+	virtual void OnInit() override;
 
 private:
 	int m_ParticleQuadContainerIndex;
+	int m_ExtraParticleQuadContainerIndex;
 
 	enum
 	{
@@ -89,11 +102,15 @@ private:
 	{
 	public:
 		CParticles *m_pParts;
-		virtual void OnRender() { m_pParts->RenderGroup(TGROUP); }
+		virtual int Sizeof() const override { return sizeof(*this); }
+		virtual void OnRender() override { m_pParts->RenderGroup(TGROUP); }
 	};
 
 	CRenderGroup<GROUP_PROJECTILE_TRAIL> m_RenderTrail;
 	CRenderGroup<GROUP_EXPLOSIONS> m_RenderExplosions;
+	CRenderGroup<GROUP_EXTRA> m_RenderExtra;
 	CRenderGroup<GROUP_GENERAL> m_RenderGeneral;
+
+	bool ParticleIsVisibleOnScreen(const vec2 &CurPos, float CurSize);
 };
 #endif

@@ -9,16 +9,50 @@
 #include <engine/client.h>
 #include <engine/console.h>
 #include <engine/shared/config.h>
+
+#include <game/collision.h>
 #include <game/gamecore.h>
 #include <game/layers.h>
-#include <game/localization.h>
-
 #include <game/teamscore.h>
 
-#include <game/client/prediction/entities/character.h>
-#include <game/client/prediction/entities/laser.h>
-#include <game/client/prediction/entities/pickup.h>
 #include <game/client/prediction/gameworld.h>
+
+// components
+#include "components/background.h"
+#include "components/binds.h"
+#include "components/broadcast.h"
+#include "components/camera.h"
+#include "components/chat.h"
+#include "components/console.h"
+#include "components/controls.h"
+#include "components/countryflags.h"
+#include "components/damageind.h"
+#include "components/debughud.h"
+#include "components/effects.h"
+#include "components/emoticon.h"
+#include "components/flow.h"
+#include "components/freezebars.h"
+#include "components/ghost.h"
+#include "components/hud.h"
+#include "components/items.h"
+#include "components/killmessages.h"
+#include "components/mapimages.h"
+#include "components/maplayers.h"
+#include "components/mapsounds.h"
+#include "components/menu_background.h"
+#include "components/menus.h"
+#include "components/motd.h"
+#include "components/nameplates.h"
+#include "components/particles.h"
+#include "components/players.h"
+#include "components/race_demo.h"
+#include "components/scoreboard.h"
+#include "components/skins.h"
+#include "components/sounds.h"
+#include "components/spectator.h"
+#include "components/statboard.h"
+#include "components/tooltips.h"
+#include "components/voting.h"
 
 class CGameInfo
 {
@@ -28,6 +62,7 @@ public:
 	bool m_UnlimitedAmmo;
 	bool m_DDRaceRecordMessage;
 	bool m_RaceRecordMessage;
+	bool m_RaceSounds;
 
 	bool m_AllowEyeWheel;
 	bool m_AllowHookColl;
@@ -49,32 +84,77 @@ public:
 	bool m_EntitiesFNG;
 	bool m_EntitiesVanilla;
 	bool m_EntitiesBW;
+	bool m_EntitiesFDDrace;
 
 	bool m_Race;
 
 	bool m_DontMaskEntities;
 	bool m_AllowXSkins;
+
+	bool m_HudHealthArmor;
+	bool m_HudAmmo;
+	bool m_HudDDRace;
+
+	bool m_NoWeakHookAndBounce;
+};
+
+class CSnapEntities
+{
+public:
+	IClient::CSnapItem m_Item;
+	const void *m_pData;
+	const CNetObj_EntityEx *m_pDataEx;
 };
 
 class CGameClient : public IGameClient
 {
-	class CStack
-	{
-	public:
-		enum
-		{
-			MAX_COMPONENTS = 64,
-		};
+public:
+	// all components
+	CKillMessages m_KillMessages;
+	CCamera m_Camera;
+	CChat m_Chat;
+	CMotd m_Motd;
+	CBroadcast m_Broadcast;
+	CGameConsole m_GameConsole;
+	CBinds m_Binds;
+	CParticles m_Particles;
+	CMenus m_Menus;
+	CSkins m_Skins;
+	CCountryFlags m_CountryFlags;
+	CFlow m_Flow;
+	CHud m_Hud;
+	CDebugHud m_DebugHud;
+	CControls m_Controls;
+	CEffects m_Effects;
+	CScoreboard m_Scoreboard;
+	CStatboard m_Statboard;
+	CSounds m_Sounds;
+	CEmoticon m_Emoticon;
+	CDamageInd m_DamageInd;
+	CVoting m_Voting;
+	CSpectator m_Spectator;
 
-		CStack();
-		void Add(class CComponent *pComponent);
+	CPlayers m_Players;
+	CNamePlates m_NamePlates;
+	CFreezeBars m_FreezeBars;
+	CItems m_Items;
+	CMapImages m_MapImages;
 
-		class CComponent *m_paComponents[MAX_COMPONENTS];
-		int m_Num;
-	};
+	CMapLayers m_MapLayersBackGround = CMapLayers{CMapLayers::TYPE_BACKGROUND};
+	CMapLayers m_MapLayersForeGround = CMapLayers{CMapLayers::TYPE_FOREGROUND};
+	CBackground m_BackGround;
+	CMenuBackground m_MenuBackground;
 
-	CStack m_All;
-	CStack m_Input;
+	CMapSounds m_MapSounds;
+
+	CRaceDemo m_RaceDemo;
+	CGhost m_Ghost;
+
+	CTooltips m_Tooltips;
+
+private:
+	std::vector<class CComponent *> m_vpAll;
+	std::vector<class CComponent *> m_vpInput;
 	CNetObjHandler m_NetObjHandler;
 
 	class IEngine *m_pEngine;
@@ -83,9 +163,11 @@ class CGameClient : public IGameClient
 	class ITextRender *m_pTextRender;
 	class IClient *m_pClient;
 	class ISound *m_pSound;
+	class CConfig *m_pConfig;
 	class IConsole *m_pConsole;
 	class IStorage *m_pStorage;
 	class IDemoPlayer *m_pDemoPlayer;
+	class IFavorites *m_pFavorites;
 	class IServerBrowser *m_pServerBrowser;
 	class IEditor *m_pEditor;
 	class IFriends *m_pFriends;
@@ -95,21 +177,21 @@ class CGameClient : public IGameClient
 #endif
 
 	CLayers m_Layers;
-	class CCollision m_Collision;
+	CCollision m_Collision;
 	CUI m_UI;
 
 	void ProcessEvents();
 	void UpdatePositions();
 
 	int m_PredictedTick;
-	int m_LastNewPredictedTick[NUM_DUMMIES];
+	int m_aLastNewPredictedTick[NUM_DUMMIES];
 
 	int m_LastRoundStartTick;
 
 	int m_LastFlagCarrierRed;
 	int m_LastFlagCarrierBlue;
 
-	int m_CheckInfo[NUM_DUMMIES];
+	int m_aCheckInfo[NUM_DUMMIES];
 
 	char m_aDDNetVersionStr[64];
 
@@ -134,14 +216,16 @@ public:
 	class ISound *Sound() const { return m_pSound; }
 	class IInput *Input() const { return m_pInput; }
 	class IStorage *Storage() const { return m_pStorage; }
+	class CConfig *Config() const { return m_pConfig; }
 	class IConsole *Console() { return m_pConsole; }
 	class ITextRender *TextRender() const { return m_pTextRender; }
 	class IDemoPlayer *DemoPlayer() const { return m_pDemoPlayer; }
 	class IDemoRecorder *DemoRecorder(int Recorder) const { return Client()->DemoRecorder(Recorder); }
+	class IFavorites *Favorites() const { return m_pFavorites; }
 	class IServerBrowser *ServerBrowser() const { return m_pServerBrowser; }
 	class CRenderTools *RenderTools() { return &m_RenderTools; }
-	class CLayers *Layers() { return &m_Layers; };
-	class CCollision *Collision() { return &m_Collision; };
+	class CLayers *Layers() { return &m_Layers; }
+	CCollision *Collision() { return &m_Collision; }
 	class IEditor *Editor() { return m_pEditor; }
 	class IFriends *Friends() { return m_pFriends; }
 	class IFriends *Foes() { return m_pFoes; }
@@ -161,10 +245,10 @@ public:
 	bool m_SuppressEvents;
 	bool m_NewTick;
 	bool m_NewPredictedTick;
-	int m_FlagDropTick[2];
+	int m_aFlagDropTick[2];
 
 	// TODO: move this
-	CTuningParams m_Tuning[NUM_DUMMIES];
+	CTuningParams m_aTuning[NUM_DUMMIES];
 
 	enum
 	{
@@ -191,16 +275,16 @@ public:
 		const CNetObj_PlayerInfo *m_pLocalInfo;
 		const CNetObj_SpectatorInfo *m_pSpectatorInfo;
 		const CNetObj_SpectatorInfo *m_pPrevSpectatorInfo;
-		const CNetObj_Flag *m_paFlags[2];
+		const CNetObj_Flag *m_apFlags[2];
 		const CNetObj_GameInfo *m_pGameInfoObj;
 		const CNetObj_GameData *m_pGameDataObj;
 		int m_GameDataSnapID;
 
-		const CNetObj_PlayerInfo *m_paPlayerInfos[MAX_CLIENTS];
-		const CNetObj_PlayerInfo *m_paInfoByScore[MAX_CLIENTS];
-		const CNetObj_PlayerInfo *m_paInfoByName[MAX_CLIENTS];
-		const CNetObj_PlayerInfo *m_paInfoByDDTeamScore[MAX_CLIENTS];
-		const CNetObj_PlayerInfo *m_paInfoByDDTeamName[MAX_CLIENTS];
+		const CNetObj_PlayerInfo *m_apPlayerInfos[MAX_CLIENTS];
+		const CNetObj_PlayerInfo *m_apInfoByScore[MAX_CLIENTS];
+		const CNetObj_PlayerInfo *m_apInfoByName[MAX_CLIENTS];
+		const CNetObj_PlayerInfo *m_apInfoByDDTeamScore[MAX_CLIENTS];
+		const CNetObj_PlayerInfo *m_apInfoByDDTeamName[MAX_CLIENTS];
 
 		int m_LocalClientID;
 		int m_NumPlayers;
@@ -225,7 +309,9 @@ public:
 			CNetObj_Character m_Cur;
 
 			CNetObj_DDNetCharacter m_ExtendedData;
+			const CNetObj_DDNetCharacter *m_PrevExtendedData;
 			bool m_HasExtendedData;
+			bool m_HasExtendedDisplayInfo;
 
 			// interpolated position
 			vec2 m_Position;
@@ -235,6 +321,10 @@ public:
 	};
 
 	CSnapState m_Snap;
+	int m_aLocalTuneZone[NUM_DUMMIES];
+	bool m_aReceivedTuning[NUM_DUMMIES];
+	int m_aExpectingTuningForZone[NUM_DUMMIES];
+	int m_aExpectingTuningSince[NUM_DUMMIES];
 
 	// client data
 	struct CClientData
@@ -250,23 +340,25 @@ public:
 		int m_SkinColor;
 		int m_Team;
 		int m_Emoticon;
-		int m_EmoticonStart;
+		float m_EmoticonStartFraction;
+		int m_EmoticonStartTick;
 		bool m_Solo;
 		bool m_Jetpack;
-		bool m_NoCollision;
+		bool m_CollisionDisabled;
 		bool m_EndlessHook;
 		bool m_EndlessJump;
-		bool m_NoHammerHit;
-		bool m_NoGrenadeHit;
-		bool m_NoLaserHit;
-		bool m_NoShotgunHit;
-		bool m_NoHookHit;
+		bool m_HammerHitDisabled;
+		bool m_GrenadeHitDisabled;
+		bool m_LaserHitDisabled;
+		bool m_ShotgunHitDisabled;
+		bool m_HookHitDisabled;
 		bool m_Super;
 		bool m_HasTelegunGun;
 		bool m_HasTelegunGrenade;
 		bool m_HasTelegunLaser;
 		int m_FreezeEnd;
 		bool m_DeepFrozen;
+		bool m_LiveFrozen;
 
 		CCharacterCore m_Predicted;
 		CCharacterCore m_PrevPredicted;
@@ -286,10 +378,13 @@ public:
 		bool m_Paused;
 		bool m_Spec;
 
+		// Editor allows 256 switches for now.
+		bool m_aSwitchStates[256];
+
 		CNetObj_Character m_Snapped;
 		CNetObj_Character m_Evolved;
 
-		void UpdateRenderInfo();
+		void UpdateRenderInfo(bool IsTeamPlay);
 		void Reset();
 
 		// rendered characters
@@ -298,10 +393,10 @@ public:
 		vec2 m_RenderPos;
 		bool m_IsPredicted;
 		bool m_IsPredictedLocal;
-		int64 m_SmoothStart[2];
-		int64 m_SmoothLen[2];
-		vec2 m_PredPos[200];
-		int m_PredTick[200];
+		int64_t m_aSmoothStart[2];
+		int64_t m_aSmoothLen[2];
+		vec2 m_aPredPos[200];
+		int m_aPredTick[200];
 		bool m_SpecCharPresent;
 		vec2 m_SpecChar;
 	};
@@ -341,8 +436,8 @@ public:
 			m_Active = false;
 			m_IngameTicks += Tick - m_JoinTick;
 		};
-		int GetIngameTicks(int Tick) const { return m_IngameTicks + Tick - m_JoinTick; };
-		float GetFPM(int Tick, int TickSpeed) const { return (float)(m_Frags * TickSpeed * 60) / GetIngameTicks(Tick); };
+		int GetIngameTicks(int Tick) const { return m_IngameTicks + Tick - m_JoinTick; }
+		float GetFPM(int Tick, int TickSpeed) const { return (float)(m_Frags * TickSpeed * 60) / GetIngameTicks(Tick); }
 	};
 
 	CClientStats m_aStats[MAX_CLIENTS];
@@ -351,26 +446,28 @@ public:
 
 	void OnReset();
 
+	size_t ComponentCount() { return m_vpAll.size(); }
+
 	// hooks
-	virtual void OnConnected();
-	virtual void OnRender();
-	virtual void OnUpdate();
-	virtual void OnDummyDisconnect();
+	void OnConnected() override;
+	void OnRender() override;
+	void OnUpdate() override;
+	void OnDummyDisconnect() override;
 	virtual void OnRelease();
-	virtual void OnInit();
-	virtual void OnConsoleInit();
-	virtual void OnStateChange(int NewState, int OldState);
-	virtual void OnMessage(int MsgId, CUnpacker *pUnpacker, bool IsDummy = 0);
-	virtual void InvalidateSnapshot();
-	virtual void OnNewSnapshot();
-	virtual void OnPredict();
-	virtual void OnActivateEditor();
-	virtual void OnDummySwap();
-	virtual int OnSnapInput(int *pData, bool Dummy, bool Force);
-	virtual void OnShutdown();
-	virtual void OnEnterGame();
-	virtual void OnRconType(bool UsernameReq);
-	virtual void OnRconLine(const char *pLine);
+	void OnInit() override;
+	void OnConsoleInit() override;
+	void OnStateChange(int NewState, int OldState) override;
+	void OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dummy) override;
+	void InvalidateSnapshot() override;
+	void OnNewSnapshot() override;
+	void OnPredict() override;
+	void OnActivateEditor() override;
+	void OnDummySwap() override;
+	int OnSnapInput(int *pData, bool Dummy, bool Force) override;
+	void OnShutdown() override;
+	void OnEnterGame() override;
+	void OnRconType(bool UsernameReq) override;
+	void OnRconLine(const char *pLine) override;
 	virtual void OnGameOver();
 	virtual void OnStartGame();
 	virtual void OnFlagGrab(int TeamID);
@@ -380,82 +477,64 @@ public:
 
 	void OnLanguageChange();
 
-	virtual const char *GetItemName(int Type);
-	virtual const char *Version();
-	virtual const char *NetVersion();
-	virtual int DDNetVersion();
-	virtual const char *DDNetVersionStr();
+	const char *GetItemName(int Type) const override;
+	const char *Version() const override;
+	const char *NetVersion() const override;
+	int DDNetVersion() const override;
+	const char *DDNetVersionStr() const override;
 
 	// actions
 	// TODO: move these
 	void SendSwitchTeam(int Team);
 	void SendInfo(bool Start);
-	virtual void SendDummyInfo(bool Start);
+	void SendDummyInfo(bool Start) override;
 	void SendKill(int ClientID);
-
-	// pointers to all systems
-	class CMenuBackground *m_pMenuBackground;
-	class CGameConsole *m_pGameConsole;
-	class CBinds *m_pBinds;
-	class CParticles *m_pParticles;
-	class CMenus *m_pMenus;
-	class CSkins *m_pSkins;
-	class CCountryFlags *m_pCountryFlags;
-	class CFlow *m_pFlow;
-	class CChat *m_pChat;
-	class CDamageInd *m_pDamageind;
-	class CCamera *m_pCamera;
-	class CControls *m_pControls;
-	class CEffects *m_pEffects;
-	class CSounds *m_pSounds;
-	class CMotd *m_pMotd;
-	class CMapImages *m_pMapimages;
-	class CVoting *m_pVoting;
-	class CScoreboard *m_pScoreboard;
-	class CStatboard *m_pStatboard;
-	class CItems *m_pItems;
-	class CMapLayers *m_pMapLayersBackGround;
-	class CMapLayers *m_pMapLayersForeGround;
-	class CBackground *m_pBackGround;
-
-	class CMapSounds *m_pMapSounds;
-	class CPlayers *m_pPlayers;
 
 	// DDRace
 
-	int m_LocalIDs[NUM_DUMMIES];
+	int m_aLocalIDs[NUM_DUMMIES];
 	CNetObj_PlayerInput m_DummyInput;
 	CNetObj_PlayerInput m_HammerInput;
-	int m_DummyFire;
+	unsigned int m_DummyFire;
 	bool m_ReceivedDDNetPlayer;
 
-	class CRaceDemo *m_pRaceDemo;
-	class CGhost *m_pGhost;
 	class CTeamsCore m_Teams;
 
-	int IntersectCharacter(vec2 Pos0, vec2 Pos1, vec2 &NewPos, int ownID);
+	int IntersectCharacter(vec2 HookPos, vec2 NewPos, vec2 &NewPos2, int ownID);
 
-	virtual int GetLastRaceTick();
+	int GetLastRaceTick() override;
 
-	bool AntiPingPlayers() { return g_Config.m_ClAntiPing && g_Config.m_ClAntiPingPlayers && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK && (m_Tuning[g_Config.m_ClDummy].m_PlayerCollision || m_Tuning[g_Config.m_ClDummy].m_PlayerHooking); }
+	bool IsTeamPlay() { return m_Snap.m_pGameInfoObj && m_Snap.m_pGameInfoObj->m_GameFlags & GAMEFLAG_TEAMS; }
+
+	bool AntiPingPlayers() { return g_Config.m_ClAntiPing && g_Config.m_ClAntiPingPlayers && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK && (m_aTuning[g_Config.m_ClDummy].m_PlayerCollision || m_aTuning[g_Config.m_ClDummy].m_PlayerHooking); }
 	bool AntiPingGrenade() { return g_Config.m_ClAntiPing && g_Config.m_ClAntiPingGrenade && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK; }
 	bool AntiPingWeapons() { return g_Config.m_ClAntiPing && g_Config.m_ClAntiPingWeapons && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK; }
 	bool AntiPingGunfire() { return AntiPingGrenade() && AntiPingWeapons() && g_Config.m_ClAntiPingGunfire; }
 	bool Predict() { return g_Config.m_ClPredict && !(m_Snap.m_pGameInfoObj && m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_GAMEOVER) && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK && m_Snap.m_pLocalCharacter; }
-	bool PredictDummy() { return g_Config.m_ClPredictDummy && Client()->DummyConnected() && m_Snap.m_LocalClientID >= 0 && m_PredictedDummyID >= 0; }
+	bool PredictDummy() { return g_Config.m_ClPredictDummy && Client()->DummyConnected() && m_Snap.m_LocalClientID >= 0 && m_PredictedDummyID >= 0 && !m_aClients[m_PredictedDummyID].m_Paused; }
+	CTuningParams GetTunes(int i) { return m_aTuningList[i]; }
 
 	CGameWorld m_GameWorld;
 	CGameWorld m_PredictedWorld;
 	CGameWorld m_PrevPredictedWorld;
 
-	void Echo(const char *pString);
+	std::vector<SSwitchers> &Switchers() { return m_GameWorld.m_Core.m_vSwitchers; }
+	std::vector<SSwitchers> &PredSwitchers() { return m_PredictedWorld.m_Core.m_vSwitchers; }
+
+	void DummyResetInput() override;
+	void Echo(const char *pString) override;
 	bool IsOtherTeam(int ClientID);
-	bool CanDisplayWarning();
-	bool IsDisplayingWarning();
+	int SwitchStateTeam();
+	bool IsLocalCharSuper();
+	bool CanDisplayWarning() override;
+	bool IsDisplayingWarning() override;
+	CNetObjHandler *GetNetObjHandler() override;
 
 	void LoadGameSkin(const char *pPath, bool AsDir = false);
 	void LoadEmoticonsSkin(const char *pPath, bool AsDir = false);
 	void LoadParticlesSkin(const char *pPath, bool AsDir = false);
+	void LoadHudSkin(const char *pPath, bool AsDir = false);
+	void LoadExtrasSkin(const char *pPath, bool AsDir = false);
 
 	void RefindSkins();
 
@@ -475,7 +554,7 @@ public:
 		IGraphics::CTextureHandle m_SpriteWeaponNinjaCursor;
 		IGraphics::CTextureHandle m_SpriteWeaponLaserCursor;
 
-		IGraphics::CTextureHandle m_SpriteWeaponCursors[6];
+		IGraphics::CTextureHandle m_aSpriteWeaponCursors[6];
 
 		// weapons and hook
 		IGraphics::CTextureHandle m_SpriteHookChain;
@@ -487,13 +566,13 @@ public:
 		IGraphics::CTextureHandle m_SpriteWeaponNinja;
 		IGraphics::CTextureHandle m_SpriteWeaponLaser;
 
-		IGraphics::CTextureHandle m_SpriteWeapons[6];
+		IGraphics::CTextureHandle m_aSpriteWeapons[6];
 
 		// particles
-		IGraphics::CTextureHandle m_SpriteParticles[9];
+		IGraphics::CTextureHandle m_aSpriteParticles[9];
 
 		// stars
-		IGraphics::CTextureHandle m_SpriteStars[3];
+		IGraphics::CTextureHandle m_aSpriteStars[3];
 
 		// projectiles
 		IGraphics::CTextureHandle m_SpriteWeaponGunProjectile;
@@ -503,18 +582,22 @@ public:
 		IGraphics::CTextureHandle m_SpriteWeaponNinjaProjectile;
 		IGraphics::CTextureHandle m_SpriteWeaponLaserProjectile;
 
-		IGraphics::CTextureHandle m_SpriteWeaponProjectiles[6];
+		IGraphics::CTextureHandle m_aSpriteWeaponProjectiles[6];
 
 		// muzzles
-		IGraphics::CTextureHandle m_SpriteWeaponGunMuzzles[3];
-		IGraphics::CTextureHandle m_SpriteWeaponShotgunMuzzles[3];
-		IGraphics::CTextureHandle m_SpriteWeaponNinjaMuzzles[3];
+		IGraphics::CTextureHandle m_aSpriteWeaponGunMuzzles[3];
+		IGraphics::CTextureHandle m_aSpriteWeaponShotgunMuzzles[3];
+		IGraphics::CTextureHandle m_aaSpriteWeaponNinjaMuzzles[3];
 
-		IGraphics::CTextureHandle m_SpriteWeaponsMuzzles[6][3];
+		IGraphics::CTextureHandle m_aaSpriteWeaponsMuzzles[6][3];
 
 		// pickups
 		IGraphics::CTextureHandle m_SpritePickupHealth;
 		IGraphics::CTextureHandle m_SpritePickupArmor;
+		IGraphics::CTextureHandle m_SpritePickupArmorShotgun;
+		IGraphics::CTextureHandle m_SpritePickupArmorGrenade;
+		IGraphics::CTextureHandle m_SpritePickupArmorNinja;
+		IGraphics::CTextureHandle m_SpritePickupArmorLaser;
 		IGraphics::CTextureHandle m_SpritePickupGrenade;
 		IGraphics::CTextureHandle m_SpritePickupShotgun;
 		IGraphics::CTextureHandle m_SpritePickupLaser;
@@ -522,7 +605,8 @@ public:
 		IGraphics::CTextureHandle m_SpritePickupGun;
 		IGraphics::CTextureHandle m_SpritePickupHammer;
 
-		IGraphics::CTextureHandle m_SpritePickupWeapons[6];
+		IGraphics::CTextureHandle m_aSpritePickupWeapons[6];
+		IGraphics::CTextureHandle m_aSpritePickupWeaponArmor[4];
 
 		// flags
 		IGraphics::CTextureHandle m_SpriteFlagBlue;
@@ -536,7 +620,7 @@ public:
 
 		bool IsSixup()
 		{
-			return m_SpriteNinjaBarFullLeft != -1;
+			return m_SpriteNinjaBarFullLeft.IsValid();
 		}
 	};
 
@@ -547,13 +631,13 @@ public:
 	{
 		IGraphics::CTextureHandle m_SpriteParticleSlice;
 		IGraphics::CTextureHandle m_SpriteParticleBall;
-		IGraphics::CTextureHandle m_SpriteParticleSplat[3];
+		IGraphics::CTextureHandle m_aSpriteParticleSplat[3];
 		IGraphics::CTextureHandle m_SpriteParticleSmoke;
 		IGraphics::CTextureHandle m_SpriteParticleShell;
 		IGraphics::CTextureHandle m_SpriteParticleExpl;
 		IGraphics::CTextureHandle m_SpriteParticleAirJump;
 		IGraphics::CTextureHandle m_SpriteParticleHit;
-		IGraphics::CTextureHandle m_SpriteParticles[10];
+		IGraphics::CTextureHandle m_aSpriteParticles[10];
 	};
 
 	SClientParticlesSkin m_ParticlesSkin;
@@ -561,15 +645,65 @@ public:
 
 	struct SClientEmoticonsSkin
 	{
-		IGraphics::CTextureHandle m_SpriteEmoticons[16];
+		IGraphics::CTextureHandle m_aSpriteEmoticons[16];
 	};
 
 	SClientEmoticonsSkin m_EmoticonsSkin;
 	bool m_EmoticonsSkinLoaded;
 
+	struct SClientHudSkin
+	{
+		IGraphics::CTextureHandle m_SpriteHudAirjump;
+		IGraphics::CTextureHandle m_SpriteHudAirjumpEmpty;
+		IGraphics::CTextureHandle m_SpriteHudSolo;
+		IGraphics::CTextureHandle m_SpriteHudCollisionDisabled;
+		IGraphics::CTextureHandle m_SpriteHudEndlessJump;
+		IGraphics::CTextureHandle m_SpriteHudEndlessHook;
+		IGraphics::CTextureHandle m_SpriteHudJetpack;
+		IGraphics::CTextureHandle m_SpriteHudFreezeBarFullLeft;
+		IGraphics::CTextureHandle m_SpriteHudFreezeBarFull;
+		IGraphics::CTextureHandle m_SpriteHudFreezeBarEmpty;
+		IGraphics::CTextureHandle m_SpriteHudFreezeBarEmptyRight;
+		IGraphics::CTextureHandle m_SpriteHudNinjaBarFullLeft;
+		IGraphics::CTextureHandle m_SpriteHudNinjaBarFull;
+		IGraphics::CTextureHandle m_SpriteHudNinjaBarEmpty;
+		IGraphics::CTextureHandle m_SpriteHudNinjaBarEmptyRight;
+		IGraphics::CTextureHandle m_SpriteHudHookHitDisabled;
+		IGraphics::CTextureHandle m_SpriteHudHammerHitDisabled;
+		IGraphics::CTextureHandle m_SpriteHudShotgunHitDisabled;
+		IGraphics::CTextureHandle m_SpriteHudGrenadeHitDisabled;
+		IGraphics::CTextureHandle m_SpriteHudLaserHitDisabled;
+		IGraphics::CTextureHandle m_SpriteHudGunHitDisabled;
+		IGraphics::CTextureHandle m_SpriteHudDeepFrozen;
+		IGraphics::CTextureHandle m_SpriteHudLiveFrozen;
+		IGraphics::CTextureHandle m_SpriteHudTeleportGrenade;
+		IGraphics::CTextureHandle m_SpriteHudTeleportGun;
+		IGraphics::CTextureHandle m_SpriteHudTeleportLaser;
+		IGraphics::CTextureHandle m_SpriteHudPracticeMode;
+		IGraphics::CTextureHandle m_SpriteHudDummyHammer;
+		IGraphics::CTextureHandle m_SpriteHudDummyCopy;
+	};
+
+	SClientHudSkin m_HudSkin;
+	bool m_HudSkinLoaded;
+
+	struct SClientExtrasSkin
+	{
+		IGraphics::CTextureHandle m_SpriteParticleSnowflake;
+		IGraphics::CTextureHandle m_aSpriteParticles[1];
+	};
+
+	SClientExtrasSkin m_ExtrasSkin;
+	bool m_ExtrasSkinLoaded;
+
+	const std::vector<CSnapEntities> &SnapEntities() { return m_vSnapEntities; }
+
 private:
-	bool m_DDRaceMsgSent[NUM_DUMMIES];
-	int m_ShowOthers[NUM_DUMMIES];
+	std::vector<CSnapEntities> m_vSnapEntities;
+	void SnapCollectEntities();
+
+	bool m_aDDRaceMsgSent[NUM_DUMMIES];
+	int m_aShowOthers[NUM_DUMMIES];
 
 	void UpdatePrediction();
 	void UpdateRenderedCharacters();
@@ -579,7 +713,7 @@ private:
 	int m_PredictedDummyID;
 	int m_IsDummySwapping;
 	CCharOrder m_CharOrder;
-	class CCharacter m_aLastWorldCharacters[MAX_CLIENTS];
+	int m_aSwitchStateTeam[NUM_DUMMIES];
 
 	enum
 	{
@@ -588,6 +722,10 @@ private:
 	void LoadMapSettings();
 	CTuningParams m_aTuningList[NUM_TUNEZONES];
 	CTuningParams *TuningList() { return m_aTuningList; }
+
+	float m_LastZoom;
+	float m_LastScreenAspect;
+	float m_LastDummyConnected;
 };
 
 ColorRGBA CalculateNameColor(ColorHSLA TextColorHSL);

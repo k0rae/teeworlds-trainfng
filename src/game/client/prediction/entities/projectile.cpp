@@ -1,9 +1,14 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
-#include "projectile.h"
-#include <game/generated/protocol.h>
-
 #include <engine/shared/config.h>
+
+#include <game/client/projectile_data.h>
+#include <game/collision.h>
+#include <game/generated/protocol.h>
+#include <game/mapitems.h>
+
+#include "character.h"
+#include "projectile.h"
 
 CProjectile::CProjectile(
 	CGameWorld *pGameWorld,
@@ -34,7 +39,7 @@ CProjectile::CProjectile(
 	m_Number = Number;
 	m_Freeze = Freeze;
 
-	m_TuneZone = GameWorld()->m_WorldConfig.m_PredictTiles ? Collision()->IsTune(Collision()->GetMapIndex(m_Pos)) : 0;
+	m_TuneZone = GameWorld()->m_WorldConfig.m_UseTuneZones ? Collision()->IsTune(Collision()->GetMapIndex(m_Pos)) : 0;
 
 	GameWorld()->InsertEntity(this);
 }
@@ -85,27 +90,29 @@ void CProjectile::Tick()
 	if(m_LifeSpan > -1)
 		m_LifeSpan--;
 
-	int64 TeamMask = -1LL;
 	bool isWeaponCollide = false;
 	if(
 		pOwnerChar &&
 		pTargetChr &&
-		pOwnerChar->IsAlive() &&
-		pTargetChr->IsAlive() &&
 		!pTargetChr->CanCollide(m_Owner))
 	{
 		isWeaponCollide = true;
 	}
 
-	if(((pTargetChr && (pOwnerChar ? !(pOwnerChar->m_Hit & CCharacter::DISABLE_HIT_GRENADE) : g_Config.m_SvHit || m_Owner == -1 || pTargetChr == pOwnerChar)) || Collide || GameLayerClipped(CurPos)) && !isWeaponCollide)
+	if(((pTargetChr && (pOwnerChar ? !pOwnerChar->GrenadeHitDisabled() : g_Config.m_SvHit || m_Owner == -1 || pTargetChr == pOwnerChar)) || Collide || GameLayerClipped(CurPos)) && !isWeaponCollide)
 	{
 		if(m_Explosive && (!pTargetChr || (pTargetChr && (!m_Freeze || (m_Type == WEAPON_SHOTGUN && Collide)))))
 		{
-			GameWorld()->CreateExplosion(ColPos, m_Owner, m_Type, m_Owner == -1, (!pTargetChr ? -1 : pTargetChr->Team()),
-				(m_Owner != -1) ? TeamMask : -1LL);
+			GameWorld()->CreateExplosion(ColPos, m_Owner, m_Type, m_Owner == -1, (!pTargetChr ? -1 : pTargetChr->Team()), -1LL);
 		}
-		else if(pTargetChr && m_Freeze && ((m_Layer == LAYER_SWITCH && Collision()->m_pSwitchers[m_Number].m_Status[pTargetChr->Team()]) || m_Layer != LAYER_SWITCH))
-			pTargetChr->Freeze();
+		else if(m_Freeze)
+		{
+			CCharacter *apEnts[MAX_CLIENTS];
+			int Num = GameWorld()->FindEntities(CurPos, 1.0f, (CEntity **)apEnts, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
+			for(int i = 0; i < Num; ++i)
+				if(apEnts[i] && (m_Layer != LAYER_SWITCH || (m_Layer == LAYER_SWITCH && m_Number > 0 && m_Number < (int)Switchers().size() && Switchers()[m_Number].m_aStatus[apEnts[i]->Team()])))
+					apEnts[i]->Freeze();
+		}
 		if(Collide && m_Bouncing != 0)
 		{
 			m_StartTick = GameWorld()->GameTick();
@@ -114,18 +121,18 @@ void CProjectile::Tick()
 				m_Direction.x = -m_Direction.x;
 			else if(m_Bouncing == 2)
 				m_Direction.y = -m_Direction.y;
-			if(fabs(m_Direction.x) < 1e-6)
+			if(fabs(m_Direction.x) < 1e-6f)
 				m_Direction.x = 0;
-			if(fabs(m_Direction.y) < 1e-6)
+			if(fabs(m_Direction.y) < 1e-6f)
 				m_Direction.y = 0;
 			m_Pos += m_Direction;
 		}
 		else if(m_Type == WEAPON_GUN)
 		{
-			GameWorld()->DestroyEntity(this);
+			m_MarkedForDestroy = true;
 		}
 		else if(!m_Freeze)
-			GameWorld()->DestroyEntity(this);
+			m_MarkedForDestroy = true;
 	}
 	if(m_LifeSpan == -1)
 	{
@@ -134,12 +141,9 @@ void CProjectile::Tick()
 			if(m_Owner >= 0)
 				pOwnerChar = GameWorld()->GetCharacterByID(m_Owner);
 
-			int64 TeamMask = -1LL;
-
-			GameWorld()->CreateExplosion(ColPos, m_Owner, m_Type, m_Owner == -1, (!pOwnerChar ? -1 : pOwnerChar->Team()),
-				(m_Owner != -1) ? TeamMask : -1LL);
+			GameWorld()->CreateExplosion(ColPos, m_Owner, m_Type, m_Owner == -1, (!pOwnerChar ? -1 : pOwnerChar->Team()), -1LL);
 		}
-		GameWorld()->DestroyEntity(this);
+		m_MarkedForDestroy = true;
 	}
 }
 
@@ -150,21 +154,28 @@ void CProjectile::SetBouncing(int Value)
 	m_Bouncing = Value;
 }
 
-CProjectile::CProjectile(CGameWorld *pGameWorld, int ID, CNetObj_Projectile *pProj) :
+CProjectile::CProjectile(CGameWorld *pGameWorld, int ID, CProjectileData *pProj, const CNetObj_EntityEx *pEntEx) :
 	CEntity(pGameWorld, CGameWorld::ENTTYPE_PROJECTILE)
 {
-	ExtractInfo(pProj, &m_Pos, &m_Direction);
-	if(UseExtraInfo(pProj))
-		ExtractExtraInfo(pProj, &m_Owner, &m_Explosive, &m_Bouncing, &m_Freeze);
+	m_Pos = pProj->m_StartPos;
+	m_Direction = pProj->m_StartVel;
+	if(pProj->m_ExtraInfo)
+	{
+		m_Owner = pProj->m_Owner;
+		m_Explosive = pProj->m_Explosive;
+		m_Bouncing = pProj->m_Bouncing;
+		m_Freeze = pProj->m_Freeze;
+	}
 	else
 	{
 		m_Owner = -1;
-		m_Bouncing = m_Freeze = 0;
+		m_Bouncing = 0;
+		m_Freeze = false;
 		m_Explosive = (pProj->m_Type == WEAPON_GRENADE) && (fabs(1.0f - length(m_Direction)) < 0.015f);
 	}
 	m_Type = pProj->m_Type;
 	m_StartTick = pProj->m_StartTick;
-	m_TuneZone = GameWorld()->m_WorldConfig.m_PredictTiles ? Collision()->IsTune(Collision()->GetMapIndex(m_Pos)) : 0;
+	m_TuneZone = pProj->m_TuneZone;
 
 	int Lifetime = 20 * GameWorld()->GameTickSpeed();
 	m_SoundImpact = -1;
@@ -179,47 +190,30 @@ CProjectile::CProjectile(CGameWorld *pGameWorld, int ID, CNetObj_Projectile *pPr
 		Lifetime = GetTuning(m_TuneZone)->m_ShotgunLifetime * GameWorld()->GameTickSpeed();
 	m_LifeSpan = Lifetime - (pGameWorld->GameTick() - m_StartTick);
 	m_ID = ID;
-}
+	m_Layer = LAYER_GAME;
+	m_Number = 0;
 
-void CProjectile::FillInfo(CNetObj_Projectile *pProj)
-{
-	pProj->m_X = (int)m_Pos.x;
-	pProj->m_Y = (int)m_Pos.y;
-	pProj->m_VelX = (int)(m_Direction.x * 100.0f);
-	pProj->m_VelY = (int)(m_Direction.y * 100.0f);
-	pProj->m_StartTick = m_StartTick;
-	pProj->m_Type = m_Type;
-}
-
-void CProjectile::FillExtraInfo(CNetObj_Projectile *pProj)
-{
-	const int MaxPos = 0x7fffffff / 100;
-	if(abs((int)m_Pos.y) + 1 >= MaxPos || abs((int)m_Pos.x) + 1 >= MaxPos)
+	if(pEntEx)
 	{
-		//If the modified data would be too large to fit in an integer, send normal data instead
-		FillInfo(pProj);
-		return;
+		m_Layer = LAYER_SWITCH;
+		m_Number = pEntEx->m_SwitchNumber;
 	}
-	//Send additional/modified info, by modifiying the fields of the netobj
-	float Angle = -atan2f(m_Direction.x, m_Direction.y);
+}
 
-	int Data = 0;
-	Data |= (abs(m_Owner) & 255) << 0;
-	if(m_Owner < 0)
-		Data |= 1 << 8;
-	Data |= 1 << 9; //This bit tells the client to use the extra info
-	Data |= (m_Bouncing & 3) << 10;
-	if(m_Explosive)
-		Data |= 1 << 12;
-	if(m_Freeze)
-		Data |= 1 << 13;
-
-	pProj->m_X = (int)(m_Pos.x * 100.0f);
-	pProj->m_Y = (int)(m_Pos.y * 100.0f);
-	pProj->m_VelX = (int)(Angle * 1000000.0f);
-	pProj->m_VelY = Data;
-	pProj->m_StartTick = m_StartTick;
-	pProj->m_Type = m_Type;
+CProjectileData CProjectile::GetData() const
+{
+	CProjectileData Result;
+	Result.m_StartPos = m_Pos;
+	Result.m_StartVel = m_Direction;
+	Result.m_Type = m_Type;
+	Result.m_StartTick = m_StartTick;
+	Result.m_ExtraInfo = true;
+	Result.m_Owner = m_Owner;
+	Result.m_Explosive = m_Explosive;
+	Result.m_Bouncing = m_Bouncing;
+	Result.m_Freeze = m_Freeze;
+	Result.m_TuneZone = m_TuneZone;
+	return Result;
 }
 
 bool CProjectile::Match(CProjectile *pProj)
@@ -233,10 +227,4 @@ bool CProjectile::Match(CProjectile *pProj)
 	if(distance(pProj->m_Direction, m_Direction) > 2.f)
 		return false;
 	return true;
-}
-
-int CProjectile::NetworkClipped(vec2 ViewPos)
-{
-	float Ct = (GameWorld()->GameTick() - m_StartTick) / (float)GameWorld()->GameTickSpeed();
-	return ((CEntity *)this)->NetworkClipped(GetPos(Ct), ViewPos);
 }

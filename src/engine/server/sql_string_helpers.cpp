@@ -2,26 +2,25 @@
 
 #include <base/system.h>
 #include <cmath>
-#include <cstring>
 
-void sqlstr::FuzzyString(char *pString, int size)
+void sqlstr::FuzzyString(char *pString, int Size)
 {
-	char *newString = new char[size * 4 - 1];
-	int pos = 0;
+	char *pNewString = new char[Size * 4 - 1];
+	int OutPos = 0;
 
-	for(int i = 0; i < size; i++)
+	for(int i = 0; i < Size; i++)
 	{
 		if(!pString[i])
 			break;
 
-		newString[pos++] = pString[i];
+		pNewString[OutPos++] = pString[i];
 		if(pString[i] != '\\' && str_utf8_isstart(pString[i + 1]))
-			newString[pos++] = '%';
+			pNewString[OutPos++] = '%';
 	}
 
-	newString[pos] = '\0';
-	str_copy(pString, newString, size);
-	delete[] newString;
+	pNewString[OutPos] = '\0';
+	str_copy(pString, pNewString, Size);
+	delete[] pNewString;
 }
 
 int sqlstr::EscapeLike(char *pDst, const char *pSrc, int DstSize)
@@ -42,6 +41,12 @@ int sqlstr::EscapeLike(char *pDst, const char *pSrc, int DstSize)
 
 void sqlstr::AgoTimeToString(int AgoTime, char *pAgoString, int Size)
 {
+	if(AgoTime <= 0)
+	{
+		str_copy(pAgoString, "moments", Size);
+		return;
+	}
+
 	char aBuf[20];
 	int aTimes[7] =
 		{
@@ -71,9 +76,9 @@ void sqlstr::AgoTimeToString(int AgoTime, char *pAgoString, int Size)
 	for(i = 0; i < 7; i++)
 	{
 		Seconds = aTimes[i];
-		str_copy(aName, aaNames[i], sizeof(aName));
+		str_copy(aName, aaNames[i]);
 
-		Count = floor((float)AgoTime / (float)Seconds);
+		Count = std::floor((float)AgoTime / (float)Seconds);
 		if(Count != 0)
 		{
 			break;
@@ -95,10 +100,10 @@ void sqlstr::AgoTimeToString(int AgoTime, char *pAgoString, int Size)
 		// getting second piece now
 		int Seconds2 = aTimes[i + 1];
 		char aName2[6];
-		str_copy(aName2, aaNames[i + 1], sizeof(aName2));
+		str_copy(aName2, aaNames[i + 1]);
 
 		// add second piece if it's greater than 0
-		int Count2 = floor((float)(AgoTime - (Seconds * Count)) / (float)Seconds2);
+		int Count2 = std::floor((float)(AgoTime - (Seconds * Count)) / (float)Seconds2);
 
 		if(Count2 != 0)
 		{

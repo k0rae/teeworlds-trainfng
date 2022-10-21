@@ -3,23 +3,36 @@
 #ifndef ENGINE_SERVERBROWSER_H
 #define ENGINE_SERVERBROWSER_H
 
+#include <base/types.h>
 #include <engine/map.h>
 #include <engine/shared/protocol.h>
-#include <game/client/ui.h>
 
 #include "kernel.h"
 
 #define DDNET_INFO "ddnet-info.json"
 
-/*
-	Structure: CServerInfo
-*/
+class CUIElement;
+
 class CServerInfo
 {
 public:
-	/*
-		Structure: CInfoClient
-	*/
+	enum
+	{
+		LOC_UNKNOWN = 0,
+		LOC_AFRICA,
+		LOC_ASIA,
+		LOC_AUSTRALIA,
+		LOC_EUROPE,
+		LOC_NORTH_AMERICA,
+		LOC_SOUTH_AMERICA,
+		// Special case China because it has an exceptionally bad
+		// connection to the outside due to the Great Firewall of
+		// China:
+		// https://en.wikipedia.org/w/index.php?title=Great_Firewall&oldid=1019589632
+		LOC_CHINA,
+		NUM_LOCS,
+	};
+
 	class CClient
 	{
 	public:
@@ -32,14 +45,14 @@ public:
 		int m_FriendState;
 	};
 
-	int m_SortedIndex;
 	int m_ServerIndex;
 
 	int m_Type;
-	uint64 m_ReceivedPackets;
+	uint64_t m_ReceivedPackets;
 	int m_NumReceivedClients;
 
-	NETADDR m_NetAddr;
+	int m_NumAddresses;
+	NETADDR m_aAddresses[MAX_SERVER_ADDRESSES];
 
 	int m_QuickSearchHit;
 	int m_FriendState;
@@ -49,8 +62,11 @@ public:
 	int m_MaxPlayers;
 	int m_NumPlayers;
 	int m_Flags;
-	bool m_Favorite;
+	TRISTATE m_Favorite;
+	TRISTATE m_FavoriteAllowPing;
 	bool m_Official;
+	int m_Location;
+	bool m_LatencyIsEstimated;
 	int m_Latency; // in ms
 	int m_HasRank;
 	char m_aGameType[16];
@@ -59,11 +75,14 @@ public:
 	int m_MapCrc;
 	int m_MapSize;
 	char m_aVersion[32];
-	char m_aAddress[NETADDR_MAXSTRSIZE];
-	CClient m_aClients[MAX_CLIENTS];
+	char m_aAddress[MAX_SERVER_ADDRESSES * NETADDR_MAXSTRSIZE];
+	CClient m_aClients[SERVERINFO_MAX_CLIENTS];
 	mutable int m_NumFilteredPlayers;
 
 	mutable CUIElement *m_pUIElement;
+
+	static int EstimateLatency(int Loc1, int Loc2);
+	static bool ParseLocation(int *pResult, const char *pString);
 };
 
 bool IsVanilla(const CServerInfo *pInfo);
@@ -115,6 +134,7 @@ public:
 		SET_DDNET_ADD,
 		SET_KOG_ADD,
 		SET_TOKEN,
+		SET_HTTPINFO,
 
 		NETWORK_DDNET = 0,
 		NETWORK_KOG = 1,
@@ -122,8 +142,8 @@ public:
 	};
 
 	virtual void Refresh(int Type) = 0;
+	virtual bool IsGettingServerlist() const = 0;
 	virtual bool IsRefreshing() const = 0;
-	virtual bool IsRefreshingMasters() const = 0;
 	virtual int LoadingProgression() const = 0;
 
 	virtual int NumServers() const = 0;
@@ -133,10 +153,6 @@ public:
 
 	virtual int NumSortedServers() const = 0;
 	virtual const CServerInfo *SortedGet(int Index) const = 0;
-
-	virtual bool IsFavorite(const NETADDR &Addr) const = 0;
-	virtual void AddFavorite(const NETADDR &Addr) = 0;
-	virtual void RemoveFavorite(const NETADDR &Addr) = 0;
 
 	virtual int NumCountries(int Network) = 0;
 	virtual int GetCountryFlag(int Network, int Index) = 0;
@@ -151,6 +167,7 @@ public:
 	virtual void CountryFilterClean(int Network) = 0;
 	virtual void TypeFilterClean(int Network) = 0;
 	virtual int GetCurrentType() = 0;
+	virtual const char *GetTutorialServer() = 0;
 };
 
 #endif

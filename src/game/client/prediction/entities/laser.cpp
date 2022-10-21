@@ -2,7 +2,9 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "laser.h"
 #include "character.h"
+#include <game/collision.h>
 #include <game/generated/protocol.h>
+#include <game/mapitems.h>
 
 #include <engine/shared/config.h>
 
@@ -17,27 +19,28 @@ CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEner
 	m_Dir = Direction;
 	m_Bounces = 0;
 	m_EvalTick = 0;
-	m_TelePos = vec2(0, 0);
 	m_WasTele = false;
 	m_Type = Type;
-	m_TuneZone = GameWorld()->m_WorldConfig.m_PredictTiles ? Collision()->IsTune(Collision()->GetMapIndex(m_Pos)) : 0;
+	m_ZeroEnergyBounceInLastTick = false;
+	m_TuneZone = GameWorld()->m_WorldConfig.m_UseTuneZones ? Collision()->IsTune(Collision()->GetMapIndex(m_Pos)) : 0;
 	GameWorld()->InsertEntity(this);
 	DoBounce();
 }
 
 bool CLaser::HitCharacter(vec2 From, vec2 To)
 {
+	static const vec2 StackedLaserShotgunBugSpeed = vec2(-2147483648.0f, -2147483648.0f);
 	vec2 At;
 	CCharacter *pOwnerChar = GameWorld()->GetCharacterByID(m_Owner);
 	CCharacter *pHit;
 	bool DontHitSelf = (g_Config.m_SvOldLaser || !GameWorld()->m_WorldConfig.m_IsDDRace) || (m_Bounces == 0 && !m_WasTele);
 
-	if(pOwnerChar ? (!(pOwnerChar->m_Hit & CCharacter::DISABLE_HIT_LASER) && m_Type == WEAPON_LASER) || (!(pOwnerChar->m_Hit & CCharacter::DISABLE_HIT_SHOTGUN) && m_Type == WEAPON_SHOTGUN) : g_Config.m_SvHit)
+	if(pOwnerChar ? (!pOwnerChar->LaserHitDisabled() && m_Type == WEAPON_LASER) || (!pOwnerChar->ShotgunHitDisabled() && m_Type == WEAPON_SHOTGUN) : g_Config.m_SvHit)
 		pHit = GameWorld()->IntersectCharacter(m_Pos, To, 0.f, At, DontHitSelf ? pOwnerChar : 0, m_Owner);
 	else
 		pHit = GameWorld()->IntersectCharacter(m_Pos, To, 0.f, At, DontHitSelf ? pOwnerChar : 0, m_Owner, pOwnerChar);
 
-	if(!pHit || (pHit == pOwnerChar && g_Config.m_SvOldLaser) || (pHit != pOwnerChar && pOwnerChar ? (pOwnerChar->m_Hit & CCharacter::DISABLE_HIT_LASER && m_Type == WEAPON_LASER) || (pOwnerChar->m_Hit & CCharacter::DISABLE_HIT_SHOTGUN && m_Type == WEAPON_SHOTGUN) : !g_Config.m_SvHit))
+	if(!pHit || (pHit == pOwnerChar && g_Config.m_SvOldLaser) || (pHit != pOwnerChar && pOwnerChar ? (pOwnerChar->LaserHitDisabled() && m_Type == WEAPON_LASER) || (pOwnerChar->ShotgunHitDisabled() && m_Type == WEAPON_SHOTGUN) : !g_Config.m_SvHit))
 		return false;
 	m_From = From;
 	m_Pos = At;
@@ -45,14 +48,36 @@ bool CLaser::HitCharacter(vec2 From, vec2 To)
 	if(m_Type == WEAPON_SHOTGUN)
 	{
 		vec2 Temp;
-
 		float Strength = GetTuning(m_TuneZone)->m_ShotgunStrength;
-
-		if(g_Config.m_SvOldLaser && pOwnerChar)
-			Temp = pHit->Core()->m_Vel + normalize(pOwnerChar->Core()->m_Pos - pHit->Core()->m_Pos) * Strength;
+		vec2 &HitPos = pHit->Core()->m_Pos;
+		if(!g_Config.m_SvOldLaser)
+		{
+			if(m_PrevPos != HitPos)
+			{
+				Temp = pHit->Core()->m_Vel + normalize(m_PrevPos - HitPos) * Strength;
+				pHit->Core()->m_Vel = ClampVel(pHit->m_MoveRestrictions, Temp);
+			}
+			else
+			{
+				pHit->Core()->m_Vel = StackedLaserShotgunBugSpeed;
+			}
+		}
+		else if(g_Config.m_SvOldLaser && pOwnerChar)
+		{
+			if(pOwnerChar->Core()->m_Pos != HitPos)
+			{
+				Temp = pHit->Core()->m_Vel + normalize(pOwnerChar->Core()->m_Pos - HitPos) * Strength;
+				pHit->Core()->m_Vel = ClampVel(pHit->m_MoveRestrictions, Temp);
+			}
+			else
+			{
+				pHit->Core()->m_Vel = StackedLaserShotgunBugSpeed;
+			}
+		}
 		else
-			Temp = pHit->Core()->m_Vel + normalize(m_PrevPos - pHit->Core()->m_Pos) * Strength;
-		pHit->Core()->m_Vel = ClampVel(pHit->m_MoveRestrictions, Temp);
+		{
+			pHit->Core()->m_Vel = ClampVel(pHit->m_MoveRestrictions, pHit->Core()->m_Vel);
+		}
 	}
 	else if(m_Type == WEAPON_LASER)
 	{
@@ -67,7 +92,7 @@ void CLaser::DoBounce()
 
 	if(m_Energy < 0)
 	{
-		GameWorld()->DestroyEntity(this);
+		m_MarkedForDestroy = true;
 		return;
 	}
 	m_PrevPos = m_Pos;
@@ -112,7 +137,17 @@ void CLaser::DoBounce()
 			m_Pos = TempPos;
 			m_Dir = normalize(TempDir);
 
-			m_Energy -= distance(m_From, m_Pos) + GetTuning(m_TuneZone)->m_LaserBounceCost;
+			const float Distance = distance(m_From, m_Pos);
+			// Prevent infinite bounces
+			if(Distance == 0.0f && m_ZeroEnergyBounceInLastTick)
+			{
+				m_Energy = -1;
+			}
+			else
+			{
+				m_Energy -= Distance + GetTuning(m_TuneZone)->m_LaserBounceCost;
+			}
+			m_ZeroEnergyBounceInLastTick = Distance == 0.0f;
 
 			m_Bounces++;
 			m_WasTele = false;
@@ -158,7 +193,7 @@ CLaser::CLaser(CGameWorld *pGameWorld, int ID, CNetObj_Laser *pLaser) :
 	m_From.x = pLaser->m_FromX;
 	m_From.y = pLaser->m_FromY;
 	m_EvalTick = pLaser->m_StartTick;
-	m_TuneZone = GameWorld()->m_WorldConfig.m_PredictTiles ? Collision()->IsTune(Collision()->GetMapIndex(m_Pos)) : 0;
+	m_TuneZone = GameWorld()->m_WorldConfig.m_UseTuneZones ? Collision()->IsTune(Collision()->GetMapIndex(m_Pos)) : 0;
 	m_Owner = -2;
 	m_Energy = GetTuning(m_TuneZone)->m_LaserReach;
 	if(pGameWorld->m_WorldConfig.m_IsFNG && m_Energy < 10.f)
@@ -192,7 +227,5 @@ bool CLaser::Match(CLaser *pLaser)
 	const vec2 ThisDiff = m_Pos - m_From;
 	const vec2 OtherDiff = pLaser->m_Pos - pLaser->m_From;
 	const float DirError = distance(normalize(OtherDiff) * length(ThisDiff), ThisDiff);
-	if(DirError > 2.f)
-		return false;
-	return true;
+	return DirError <= 2.f;
 }

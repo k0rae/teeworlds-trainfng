@@ -4,15 +4,17 @@
 #define GAME_CLIENT_PREDICTION_GAMEWORLD_H
 
 #include <game/gamecore.h>
+#include <game/teamscore.h>
 
 #include <list>
 
-class CEntity;
+class CCollision;
 class CCharacter;
+class CEntity;
 
 class CGameWorld
 {
-	friend class CCharacter;
+	friend CCharacter;
 
 public:
 	enum
@@ -34,17 +36,15 @@ public:
 	CEntity *FindFirst(int Type);
 	CEntity *FindLast(int Type);
 	int FindEntities(vec2 Pos, float Radius, CEntity **ppEnts, int Max, int Type);
-	class CCharacter *IntersectCharacter(vec2 Pos0, vec2 Pos1, float Radius, vec2 &NewPos, class CCharacter *pNotThis = 0, int CollideWith = -1, class CCharacter *pThisOnly = 0);
+	CCharacter *IntersectCharacter(vec2 Pos0, vec2 Pos1, float Radius, vec2 &NewPos, CCharacter *pNotThis = nullptr, int CollideWith = -1, CCharacter *pThisOnly = nullptr);
 	void InsertEntity(CEntity *pEntity, bool Last = false);
 	void RemoveEntity(CEntity *pEntity);
-	void DestroyEntity(CEntity *pEntity);
+	void RemoveCharacter(CCharacter *pChar);
 	void Tick();
 
 	// DDRace
-
-	std::list<class CCharacter *> IntersectedCharacters(vec2 Pos0, vec2 Pos1, float Radius, vec2 &NewPos, class CEntity *pNotThis);
 	void ReleaseHooked(int ClientID);
-	std::list<class CCharacter *> IntersectedCharacters(vec2 Pos0, vec2 Pos1, float Radius, class CEntity *pNotThis = 0);
+	std::list<CCharacter *> IntersectedCharacters(vec2 Pos0, vec2 Pos1, float Radius, CEntity *pNotThis = nullptr);
 
 	int m_GameTick;
 	int m_GameTickSpeed;
@@ -53,14 +53,15 @@ public:
 	// getter for server variables
 	int GameTick() { return m_GameTick; }
 	int GameTickSpeed() { return m_GameTickSpeed; }
-	class CCollision *Collision() { return m_pCollision; }
+	CCollision *Collision() { return m_pCollision; }
 	CTeamsCore *Teams() { return &m_Teams; }
+	std::vector<SSwitchers> &Switchers() { return m_Core.m_vSwitchers; }
 	CTuningParams *Tuning();
 	CEntity *GetEntity(int ID, int EntityType);
-	class CCharacter *GetCharacterByID(int ID) { return (ID >= 0 && ID < MAX_CLIENTS) ? m_apCharacters[ID] : 0; }
+	CCharacter *GetCharacterByID(int ID) { return (ID >= 0 && ID < MAX_CLIENTS) ? m_apCharacters[ID] : nullptr; }
 
 	// from gamecontext
-	void CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamage, int ActivatedTeam, int64 Mask);
+	void CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamage, int ActivatedTeam, int64_t Mask);
 
 	// for client side prediction
 	struct
@@ -74,6 +75,9 @@ public:
 		bool m_PredictWeapons;
 		bool m_PredictDDRace;
 		bool m_IsSolo;
+		bool m_UseTuneZones;
+		bool m_BugDDRaceInput;
+		bool m_NoWeakHookAndBounce;
 	} m_WorldConfig;
 
 	bool m_IsValidCopy;
@@ -83,24 +87,23 @@ public:
 	void OnModified();
 	void NetObjBegin();
 	void NetCharAdd(int ObjID, CNetObj_Character *pChar, CNetObj_DDNetCharacter *pExtended, int GameTeam, bool IsLocal);
-	void NetObjAdd(int ObjID, int ObjType, const void *pObjData);
+	void NetObjAdd(int ObjID, int ObjType, const void *pObjData, const CNetObj_EntityEx *pDataEx);
 	void NetObjEnd(int LocalID);
 	void CopyWorld(CGameWorld *pFrom);
 	CEntity *FindMatch(int ObjID, int ObjType, const void *pObjData);
 	void Clear();
 
-	CTuningParams m_Tuning[2];
 	CTuningParams *m_pTuningList;
 	CTuningParams *TuningList() { return m_pTuningList; }
-	CTuningParams *GetTuning(int i) { return i == 0 ? Tuning() : &TuningList()[i]; }
+	CTuningParams *GetTuning(int i) { return &TuningList()[i]; }
 
 private:
 	void RemoveEntities();
 
-	CEntity *m_pNextTraverseEntity;
+	CEntity *m_pNextTraverseEntity = nullptr;
 	CEntity *m_apFirstEntityTypes[NUM_ENTTYPES];
 
-	class CCharacter *m_apCharacters[MAX_CLIENTS];
+	CCharacter *m_apCharacters[MAX_CLIENTS];
 };
 
 class CCharOrder

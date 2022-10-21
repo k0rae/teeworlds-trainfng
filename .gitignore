@@ -8,6 +8,7 @@ docs/
 bundle/
 !/other/bundle/
 
+.DS_Store
 .ninja_deps
 .ninja_log
 CMakeCache.txt
@@ -21,6 +22,7 @@ Makefile
 Release
 _CPack_Packages/
 build.ninja
+checksummed_*
 cmake_install.cmake
 gmock.pc
 gmock_main.pc
@@ -33,11 +35,16 @@ install_manifest*.txt
 ninja_package
 pack_*/
 rules.ninja
+SAN.*
 testrunner\[1\]_include.cmake
+vulkan_shaders_sha256.txt
+
+/SDL2.framework
 
 # Ignore all the generated executables without extensions (for non-Windows
 # systems).
 DDNet
+!DDNet/
 TrainFNG-Server
 TrainFNG-Server-Launcher
 libsteam_api.a
@@ -50,21 +57,35 @@ fake_server
 map_convert_07
 map_diff
 map_extract
+map_optimize
+map_replace_area
 map_replace_image
 map_resave
+map_update_fng
 map_version
 mastersrv
 packetgen
+stun
 testrunner
 twping
 unicode_confusables
 uuid
 versionsrv
 
+# But we still should allow to download mastersrv/twping sources
+!src/mastersrv
+!src/twping
+
 generated
+target
+
+/build*
+/integration_test/*
 
 # IDE project files
+.cache
 .cproject
+.cmake
 .idea
 .project
 .settings
@@ -81,12 +102,17 @@ tags
 /config.lua
 /objs
 
+*.a
 *.cmd
+*.csv
 *.dll
 *.dmg
 *.dtb
+*.dylib
 *.exe
+*.fifo
 *.filters
+*.json
 *.lnk
 *.log
 *.opensdf

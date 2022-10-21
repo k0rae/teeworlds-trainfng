@@ -3,9 +3,13 @@
 #ifndef GAME_CLIENT_COMPONENTS_MENUS_H
 #define GAME_CLIENT_COMPONENTS_MENUS_H
 
-#include <base/tl/sorted_array.h>
+#include <base/types.h>
 #include <base/vmath.h>
 
+#include <chrono>
+#include <vector>
+
+#include <engine/console.h>
 #include <engine/demo.h>
 #include <engine/friends.h>
 #include <engine/shared/config.h>
@@ -15,13 +19,32 @@
 
 #include <game/client/component.h>
 #include <game/client/ui.h>
+#include <game/client/ui_ex.h>
 #include <game/voting.h>
+
+#include <game/client/render.h>
 
 struct CServerProcess
 {
 	PROCESS Process;
 	bool Initialized;
 	CLineReader LineReader;
+};
+
+struct SColorPicker
+{
+public:
+	const float ms_Width = 160.0f;
+	const float ms_Height = 186.0f;
+
+	float m_X;
+	float m_Y;
+
+	bool m_Active;
+
+	CUIRect m_AttachedRect;
+	unsigned int *m_pColor;
+	unsigned int m_HSVColor;
 };
 
 // compnent to fetch keypresses, override all other input
@@ -31,9 +54,10 @@ public:
 	bool m_TakeKey;
 	bool m_GotKey;
 	IInput::CEvent m_Key;
-	int m_Modifier;
+	int m_ModifierCombination;
 	CMenusKeyBinder();
-	virtual bool OnInput(IInput::CEvent Event);
+	virtual int Sizeof() const override { return sizeof(*this); }
+	virtual bool OnInput(IInput::CEvent Event) override;
 };
 
 class CMenus : public CComponent
@@ -49,65 +73,55 @@ class CMenus : public CComponent
 	static ColorRGBA ms_ColorTabbarActive;
 	static ColorRGBA ms_ColorTabbarHover;
 
+	static SColorPicker ms_ColorPicker;
+	static bool ms_ValueSelectorTextMode;
+
 	char m_aLocalStringHelper[1024];
 
-	float ButtonColorMulActive() { return 0.5f; }
-	float ButtonColorMulHot() { return 1.5f; }
-	float ButtonColorMulDefault() { return 1.0f; }
-	float ButtonColorMul(const void *pID);
+	CUIEx m_UIEx;
+
+	CUIEx *UIEx() { return &m_UIEx; }
 
 	int DoButton_DemoPlayer(const void *pID, const char *pText, int Checked, const CUIRect *pRect);
-	int DoButton_Sprite(const void *pID, int ImageID, int SpriteID, int Checked, const CUIRect *pRect, int Corners);
+	int DoButton_Sprite(CButtonContainer *pButtonContainer, int ImageID, int SpriteID, int Checked, const CUIRect *pRect, int Corners);
 	int DoButton_Toggle(const void *pID, int Checked, const CUIRect *pRect, bool Active);
-	int DoButton_Menu(const void *pID, const char *pText, int Checked, const CUIRect *pRect, const char *pImageName = 0, int Corners = CUI::CORNER_ALL, float r = 5.0f, float FontFactor = 0.0f, vec4 ColorHot = vec4(1.0f, 1.0f, 1.0f, 0.75f), vec4 Color = vec4(1, 1, 1, 0.5f), int AlignVertically = 1);
-	int DoButton_MenuTab(const void *pID, const char *pText, int Checked, const CUIRect *pRect, int Corners, const ColorRGBA *pDefaultColor = NULL, const ColorRGBA *pActiveColor = NULL, const ColorRGBA *pHoverColor = NULL, float EdgeRounding = 10, int AlignVertically = 1);
+	int DoButton_Menu(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, const char *pImageName = nullptr, int Corners = IGraphics::CORNER_ALL, float r = 5.0f, float FontFactor = 0.0f, vec4 ColorHot = vec4(1.0f, 1.0f, 1.0f, 0.75f), vec4 Color = vec4(1, 1, 1, 0.5f), int AlignVertically = 1, bool CheckForActiveColorPicker = false);
+	int DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, int Corners, SUIAnimator *pAnimator = nullptr, const ColorRGBA *pDefaultColor = nullptr, const ColorRGBA *pActiveColor = nullptr, const ColorRGBA *pHoverColor = nullptr, float EdgeRounding = 10, int AlignVertically = 1);
 
 	int DoButton_CheckBox_Common(const void *pID, const char *pText, const char *pBoxText, const CUIRect *pRect);
 	int DoButton_CheckBox(const void *pID, const char *pText, int Checked, const CUIRect *pRect);
+	int DoButton_CheckBoxAutoVMarginAndSet(const void *pID, const char *pText, int *pValue, CUIRect *pRect, float VMargin);
 	int DoButton_CheckBox_Number(const void *pID, const char *pText, int Checked, const CUIRect *pRect);
-
-	/*static void ui_draw_menu_button(const void *id, const char *text, int checked, const CUIRect *r, const void *extra);
-	static void ui_draw_keyselect_button(const void *id, const char *text, int checked, const CUIRect *r, const void *extra);
-	static void ui_draw_menu_tab_button(const void *id, const char *text, int checked, const CUIRect *r, const void *extra);
-	static void ui_draw_settings_tab_button(const void *id, const char *text, int checked, const CUIRect *r, const void *extra);
-	*/
-
-	int DoButton_Icon(int ImageId, int SpriteId, const CUIRect *pRect);
+	ColorHSLA DoLine_ColorPicker(CButtonContainer *pResetID, float LineSize, float WantedPickerPosition, float LabelSize, float BottomMargin, CUIRect *pMainRect, const char *pText, unsigned int *pColorValue, ColorRGBA DefaultColor, bool CheckBoxSpacing = true, bool UseCheckBox = false, int *pCheckBoxValue = nullptr);
+	void DoLaserPreview(const CUIRect *pRect, ColorHSLA OutlineColor, ColorHSLA InnerColor);
+	int DoValueSelector(void *pID, CUIRect *pRect, const char *pLabel, bool UseScroll, int Current, int Min, int Max, int Step, float Scale, bool IsHex, float Round, ColorRGBA *pColor);
 	int DoButton_GridHeader(const void *pID, const char *pText, int Checked, const CUIRect *pRect);
 
-	//static void ui_draw_browse_icon(int what, const CUIRect *r);
-	//static void ui_draw_grid_header(const void *id, const char *text, int checked, const CUIRect *r, const void *extra);
-
-	/*static void ui_draw_checkbox_common(const void *id, const char *text, const char *boxtext, const CUIRect *r, const void *extra);
-	static void ui_draw_checkbox(const void *id, const char *text, int checked, const CUIRect *r, const void *extra);
-	static void ui_draw_checkbox_number(const void *id, const char *text, int checked, const CUIRect *r, const void *extra);
-	*/
-	int DoEditBox(void *pID, const CUIRect *pRect, char *pStr, unsigned StrSize, float FontSize, float *Offset, bool Hidden = false, int Corners = CUI::CORNER_ALL, const char *pEmptyText = "");
-	int DoClearableEditBox(void *pID, void *pClearID, const CUIRect *pRect, char *pStr, unsigned StrSize, float FontSize, float *Offset, bool Hidden = false, int Corners = CUI::CORNER_ALL, const char *pEmptyText = "");
-	//static int ui_do_edit_box(void *id, const CUIRect *rect, char *str, unsigned str_size, float font_size, bool hidden=false);
-
-	float DoScrollbarV(const void *pID, const CUIRect *pRect, float Current);
-	float DoScrollbarH(const void *pID, const CUIRect *pRect, float Current);
 	void DoButton_KeySelect(const void *pID, const char *pText, int Checked, const CUIRect *pRect);
-	int DoKeyReader(void *pID, const CUIRect *pRect, int Key, int Modifier, int *NewModifier);
+	int DoKeyReader(void *pID, const CUIRect *pRect, int Key, int ModifierCombination, int *pNewModifierCombination);
 
-	//static int ui_do_key_reader(void *id, const CUIRect *rect, int key);
-	void UiDoGetButtons(int Start, int Stop, CUIRect View, CUIRect ScopeView);
+	void DoSettingsControlsButtons(int Start, int Stop, CUIRect View);
+
+	float RenderSettingsControlsJoystick(CUIRect View);
+	void DoJoystickAxisPicker(CUIRect View);
+	void DoJoystickBar(const CUIRect *pRect, float Current, float Tolerance, bool Active);
+
+	void RenderColorPicker();
 
 	// new gui with gui elements
 	template<typename T>
-	int DoButtonMenu(CUIElement &UIElement, const void *pID, T &&GetTextLambda, int Checked, const CUIRect *pRect, bool HintRequiresStringCheck, bool HintCanChangePositionOrSize = false, int Corners = CUI::CORNER_ALL, float r = 5.0f, float FontFactor = 0.0f, vec4 ColorHot = vec4(1.0f, 1.0f, 1.0f, 0.75f), vec4 Color = vec4(1, 1, 1, 0.5f), int AlignVertically = 1)
+	int DoButtonMenu(CUIElement &UIElement, const void *pID, T &&GetTextLambda, int Checked, const CUIRect *pRect, bool HintRequiresStringCheck, bool HintCanChangePositionOrSize = false, int Corners = IGraphics::CORNER_ALL, float r = 5.0f, float FontFactor = 0.0f, vec4 ColorHot = vec4(1.0f, 1.0f, 1.0f, 0.75f), vec4 Color = vec4(1, 1, 1, 0.5f), int AlignVertically = 1)
 	{
 		CUIRect Text = *pRect;
 		Text.HMargin(pRect->h >= 20.0f ? 2.0f : 1.0f, &Text);
 		Text.HMargin((Text.h * FontFactor) / 2.0f, &Text);
 
-		if(UIElement.Size() != 3 || HintRequiresStringCheck || HintCanChangePositionOrSize)
+		if(!UIElement.AreRectsInit() || HintRequiresStringCheck || HintCanChangePositionOrSize || UIElement.Get(0)->m_UITextContainer == -1)
 		{
-			bool NeedsRecalc = UIElement.Size() != 3;
+			bool NeedsRecalc = !UIElement.AreRectsInit() || UIElement.Get(0)->m_UITextContainer == -1;
 			if(HintCanChangePositionOrSize)
 			{
-				if(UIElement.Size() == 3)
+				if(UIElement.AreRectsInit())
 				{
 					if(UIElement.Get(0)->m_X != pRect->x || UIElement.Get(0)->m_Y != pRect->y || UIElement.Get(0)->m_Width != pRect->w || UIElement.Get(0)->m_Y != pRect->h)
 					{
@@ -115,10 +129,10 @@ class CMenus : public CComponent
 					}
 				}
 			}
-			const char *pText = NULL;
+			const char *pText = nullptr;
 			if(HintRequiresStringCheck)
 			{
-				if(UIElement.Size() == 3)
+				if(UIElement.AreRectsInit())
 				{
 					pText = GetTextLambda();
 					if(str_comp(UIElement.Get(0)->m_Text.c_str(), pText) != 0)
@@ -129,57 +143,56 @@ class CMenus : public CComponent
 			}
 			if(NeedsRecalc)
 			{
-				if(UIElement.Size() > 0)
+				if(!UIElement.AreRectsInit())
 				{
-					UI()->ResetUIElement(UIElement);
+					UIElement.InitRects(3);
 				}
+				UI()->ResetUIElement(UIElement);
 
 				vec4 RealColor = Color;
 				for(int i = 0; i < 3; ++i)
 				{
 					Color.a = RealColor.a;
 					if(i == 0)
-						Color.a *= ButtonColorMulActive();
+						Color.a *= UI()->ButtonColorMulActive();
 					else if(i == 1)
-						Color.a *= ButtonColorMulHot();
+						Color.a *= UI()->ButtonColorMulHot();
 					else if(i == 2)
-						Color.a *= ButtonColorMulDefault();
+						Color.a *= UI()->ButtonColorMulDefault();
 					Graphics()->SetColor(Color);
 
-					CUIElement::SUIElementRect NewRect;
-					NewRect.m_UIRectQuadContainer = RenderTools()->CreateRoundRectQuadContainer(pRect->x, pRect->y, pRect->w, pRect->h, r, Corners);
+					CUIElement::SUIElementRect &NewRect = *UIElement.Get(i);
+					NewRect.m_UIRectQuadContainer = Graphics()->CreateRectQuadContainer(pRect->x, pRect->y, pRect->w, pRect->h, r, Corners);
 
 					NewRect.m_X = pRect->x;
 					NewRect.m_Y = pRect->y;
 					NewRect.m_Width = pRect->w;
 					NewRect.m_Height = pRect->h;
-
 					if(i == 0)
 					{
-						if(pText == NULL)
+						if(pText == nullptr)
 							pText = GetTextLambda();
 						NewRect.m_Text = pText;
-						UI()->DoLabel(NewRect, &Text, pText, Text.h * ms_FontmodHeight, 0, -1, AlignVertically);
+						SLabelProperties Props;
+						Props.m_AlignVertically = AlignVertically;
+						UI()->DoLabel(NewRect, &Text, pText, Text.h * CUI::ms_FontmodHeight, TEXTALIGN_CENTER, Props);
 					}
-					UIElement.Add(NewRect);
 				}
 				Graphics()->SetColor(1, 1, 1, 1);
 			}
 		}
-
 		// render
 		size_t Index = 2;
-		if(UI()->ActiveItem() == pID)
+		if(UI()->CheckActiveItem(pID))
 			Index = 0;
 		else if(UI()->HotItem() == pID)
 			Index = 1;
 		Graphics()->TextureClear();
 		Graphics()->RenderQuadContainer(UIElement.Get(Index)->m_UIRectQuadContainer, -1);
-		STextRenderColor ColorText(TextRender()->DefaultTextColor());
-		STextRenderColor ColorTextOutline(TextRender()->DefaultTextOutlineColor());
+		ColorRGBA ColorText(TextRender()->DefaultTextColor());
+		ColorRGBA ColorTextOutline(TextRender()->DefaultTextOutlineColor());
 		if(UIElement.Get(0)->m_UITextContainer != -1)
-			TextRender()->RenderTextContainer(UIElement.Get(0)->m_UITextContainer, &ColorText, &ColorTextOutline);
-
+			TextRender()->RenderTextContainer(UIElement.Get(0)->m_UITextContainer, ColorText, ColorTextOutline);
 		return UI()->DoButtonLogic(pID, Checked, pRect);
 	}
 
@@ -195,11 +208,19 @@ class CMenus : public CComponent
 		int ItemsPerRow, int SelectedIndex, float ScrollValue, bool LogicOnly = false);
 	CListboxItem UiDoListboxNextItem(const void *pID, bool Selected = false, bool KeyEvents = true, bool NoHoverEffects = false);
 	CListboxItem UiDoListboxNextRow();
-	int UiDoListboxEnd(float *pScrollValue, bool *pItemActivated, bool *pListBoxActive = 0);
+	int UiDoListboxEnd(float *pScrollValue, bool *pItemActivated, bool *pListBoxActive = nullptr);
 
-	//static void demolist_listdir_callback(const char *name, int is_dir, void *user);
-	//static void demolist_list_callback(const CUIRect *rect, int index, void *user);
+	int UiLogicGetCurrentClickedItem();
 
+	/**
+	 * Places and renders a tooltip near pNearRect.
+	 * For now only works correctly with single line tooltips, since Text width calculation gets broken when there are multiple lines.
+	 *
+	 * @param pID The ID of the tooltip. Usually a reference to some g_Config value.
+	 * @param pNearTo Place the tooltip near this rect.
+	 * @param pText The text to display in the tooltip
+	 */
+	void DoToolTip(const void *pID, const CUIRect *pNearRect, const char *pText, float WidthHint = -1.0f);
 	// menus_settings_assets.cpp
 public:
 	struct SCustomItem
@@ -232,11 +253,23 @@ public:
 	{
 	};
 
+	struct SCustomHud : public SCustomItem
+	{
+	};
+
+	struct SCustomExtras : public SCustomItem
+	{
+	};
+
 protected:
-	sorted_array<SCustomEntities> m_EntitiesList;
-	sorted_array<SCustomGame> m_GameList;
-	sorted_array<SCustomEmoticon> m_EmoticonList;
-	sorted_array<SCustomParticle> m_ParticlesList;
+	std::vector<SCustomEntities> m_vEntitiesList;
+	std::vector<SCustomGame> m_vGameList;
+	std::vector<SCustomEmoticon> m_vEmoticonList;
+	std::vector<SCustomParticle> m_vParticlesList;
+	std::vector<SCustomHud> m_vHudList;
+	std::vector<SCustomExtras> m_vExtrasList;
+
+	bool m_IsInit = false;
 
 	static void LoadEntities(struct SCustomEntities *pEntitiesItem, void *pUser);
 	static int EntitiesScan(const char *pName, int IsDir, int DirType, void *pUser);
@@ -244,6 +277,15 @@ protected:
 	static int GameScan(const char *pName, int IsDir, int DirType, void *pUser);
 	static int EmoticonsScan(const char *pName, int IsDir, int DirType, void *pUser);
 	static int ParticlesScan(const char *pName, int IsDir, int DirType, void *pUser);
+	static int HudScan(const char *pName, int IsDir, int DirType, void *pUser);
+	static int ExtrasScan(const char *pName, int IsDir, int DirType, void *pUser);
+
+	static void ConchainAssetsEntities(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainAssetGame(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainAssetParticles(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainAssetEmoticons(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainAssetHud(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainAssetExtras(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
 	void ClearCustomItems(int CurTab);
 
@@ -253,11 +295,10 @@ protected:
 	int m_ActivePage;
 	bool m_ShowStart;
 	bool m_MenuActive;
-	bool m_UseMouseButtons;
 	vec2 m_MousePos;
-	bool m_MouseSlow;
+	bool m_JoinTutorial;
 
-	int64 m_LastInput;
+	char m_aNextServer[256];
 
 	// images
 	struct CMenuImage
@@ -266,7 +307,7 @@ protected:
 		IGraphics::CTextureHandle m_OrgTexture;
 		IGraphics::CTextureHandle m_GreyTexture;
 	};
-	array<CMenuImage> m_lMenuImages;
+	std::vector<CMenuImage> m_vMenuImages;
 
 	static int MenuImageScan(const char *pName, int IsDir, int DirType, void *pUser);
 
@@ -298,7 +339,6 @@ protected:
 	static float ms_ButtonHeight;
 	static float ms_ListheaderHeight;
 	static float ms_ListitemAdditionalHeight;
-	static float ms_FontmodHeight;
 
 	// for settings
 	bool m_NeedRestartGeneral;
@@ -317,7 +357,7 @@ protected:
 	bool m_DeletePressed;
 
 	// for map download popup
-	int64 m_DownloadLastCheckTime;
+	int64_t m_DownloadLastCheckTime;
 	int m_DownloadLastCheckSize;
 	float m_DownloadSpeed;
 
@@ -326,6 +366,7 @@ protected:
 	int m_CallvoteSelectedPlayer;
 	char m_aCallvoteReason[VOTE_REASON_LENGTH];
 	char m_aFilterString[25];
+	bool m_ControlPageOpening;
 
 	// demo
 	enum
@@ -338,7 +379,7 @@ protected:
 
 	struct CDemoItem
 	{
-		char m_aFilename[128];
+		char m_aFilename[IO_MAX_PATH_LENGTH];
 		char m_aName[128];
 		bool m_IsDir;
 		int m_StorageType;
@@ -352,14 +393,17 @@ protected:
 
 		int NumMarkers() const
 		{
-			return ((m_TimelineMarkers.m_aNumTimelineMarkers[0] << 24) & 0xFF000000) | ((m_TimelineMarkers.m_aNumTimelineMarkers[1] << 16) & 0xFF0000) |
-			       ((m_TimelineMarkers.m_aNumTimelineMarkers[2] << 8) & 0xFF00) | (m_TimelineMarkers.m_aNumTimelineMarkers[3] & 0xFF);
+			return clamp<int>(bytes_be_to_int(m_TimelineMarkers.m_aNumTimelineMarkers), 0, MAX_TIMELINE_MARKERS);
 		}
 
 		int Length() const
 		{
-			return ((m_Info.m_aLength[0] << 24) & 0xFF000000) | ((m_Info.m_aLength[1] << 16) & 0xFF0000) |
-			       ((m_Info.m_aLength[2] << 8) & 0xFF00) | (m_Info.m_aLength[3] & 0xFF);
+			return bytes_be_to_int(m_Info.m_aLength);
+		}
+
+		unsigned Size() const
+		{
+			return bytes_be_to_uint(m_Info.m_aMapSize);
 		}
 
 		bool operator<(const CDemoItem &Other) const
@@ -396,7 +440,6 @@ protected:
 		}
 	};
 
-	//sorted_array<CDemoItem> m_lDemos;
 	char m_aCurrentDemoFolder[256];
 	char m_aCurrentDemoFile[64];
 	int m_DemolistSelectedIndex;
@@ -404,15 +447,23 @@ protected:
 	int m_DemolistStorageType;
 	int m_Speed = 4;
 
+	std::chrono::nanoseconds m_DemoPopulateStartTime{0};
+
 	void DemolistOnUpdate(bool Reset);
 	//void DemolistPopulate();
-	static int DemolistFetchCallback(const char *pName, time_t Date, int IsDir, int StorageType, void *pUser);
+	static int DemolistFetchCallback(const CFsFileInfo *pInfo, int IsDir, int StorageType, void *pUser);
 
 	// friends
 	struct CFriendItem
 	{
 		const CFriendInfo *m_pFriendInfo;
 		int m_NumFound;
+
+		CFriendItem() {}
+		CFriendItem(const CFriendInfo *pFriendInfo) :
+			m_pFriendInfo(pFriendInfo), m_NumFound(0)
+		{
+		}
 
 		bool operator<(const CFriendItem &Other) const
 		{
@@ -431,7 +482,7 @@ protected:
 		}
 	};
 
-	sorted_array<CFriendItem> m_lFriends;
+	std::vector<CFriendItem> m_vFriends;
 	int m_FriendlistSelectedIndex;
 
 	void FriendlistOnUpdate();
@@ -442,6 +493,8 @@ protected:
 	//void render_loading(float percent);
 	int RenderMenubar(CUIRect r);
 	void RenderNews(CUIRect MainView);
+	static void ConchainUpdateMusicState(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	void UpdateMusicState();
 
 	// found in menus_demo.cpp
 	static bool DemoFilterChat(const void *pData, int Size, void *pUser);
@@ -500,25 +553,26 @@ public:
 
 	void SetMenuBackground(class CMenuBackground *pBackground) { m_pBackground = pBackground; }
 
-	void UseMouseButtons(bool Use) { m_UseMouseButtons = Use; }
-
 	static CMenusKeyBinder m_Binder;
 
 	CMenus();
+	virtual int Sizeof() const override { return sizeof(*this); }
 
-	void RenderLoading();
-	void RenderUpdating(const char *pCaption, int current = 0, int total = 0);
+	void RenderLoading(const char *pCaption, const char *pContent, int IncreaseCounter, bool RenderLoadingBar = true, bool RenderMenuBackgroundMap = true);
+
+	bool IsInit() { return m_IsInit; }
 
 	bool IsActive() const { return m_MenuActive; }
 	void KillServer();
 
-	virtual void OnInit();
+	virtual void OnInit() override;
 
-	virtual void OnStateChange(int NewState, int OldState);
-	virtual void OnReset();
-	virtual void OnRender();
-	virtual bool OnInput(IInput::CEvent Event);
-	virtual bool OnMouseMove(float x, float y);
+	virtual void OnStateChange(int NewState, int OldState) override;
+	virtual void OnReset() override;
+	virtual void OnRender() override;
+	virtual bool OnInput(IInput::CEvent Event) override;
+	virtual bool OnCursorMove(float x, float y, IInput::ECursorType CursorType) override;
+	virtual void OnShutdown() override;
 
 	enum
 	{
@@ -538,21 +592,48 @@ public:
 		PAGE_NETWORK,
 		PAGE_GHOST,
 
+		PAGE_LENGTH,
+
 		SETTINGS_LANGUAGE = 0,
 		SETTINGS_GENERAL,
 		SETTINGS_PLAYER,
 		SETTINGS_TEE,
-		SETTINGS_HUD,
+		SETTINGS_APPEARANCE,
 		SETTINGS_CONTROLS,
 		SETTINGS_GRAPHICS,
 		SETTINGS_SOUND,
 		SETTINGS_DDNET,
 		SETTINGS_ASSETS,
+
+		SETTINGS_LENGTH,
+
+		BIG_TAB_NEWS = 0,
+		BIG_TAB_INTERNET,
+		BIG_TAB_LAN,
+		BIG_TAB_FAVORITES,
+		BIG_TAB_DDNET,
+		BIG_TAB_KOG,
+		BIG_TAB_DEMOS,
+
+		BIG_TAB_LENGTH,
+
+		SMALL_TAB_HOME = 0,
+		SMALL_TAB_QUIT,
+		SMALL_TAB_SETTINGS,
+		SMALL_TAB_EDITOR,
+		SMALL_TAB_DEMOBUTTON,
+		SMALL_TAB_SERVER,
+
+		SMALL_TAB_LENGTH,
 	};
 
+	SUIAnimator m_aAnimatorsBigPage[BIG_TAB_LENGTH];
+	SUIAnimator m_aAnimatorsSmallPage[SMALL_TAB_LENGTH];
+	SUIAnimator m_aAnimatorsSettingsTab[SETTINGS_LENGTH];
+
 	// DDRace
-	int DoButton_CheckBox_DontCare(const void *pID, const char *pText, int Checked, const CUIRect *pRect);
-	sorted_array<CDemoItem> m_lDemos;
+	int DoButton_CheckBox_Tristate(const void *pID, const char *pText, TRISTATE Checked, const CUIRect *pRect);
+	std::vector<CDemoItem> m_vDemos;
 	void DemolistPopulate();
 	bool m_Dummy;
 
@@ -561,7 +642,7 @@ public:
 	// Ghost
 	struct CGhostItem
 	{
-		char m_aFilename[256];
+		char m_aFilename[IO_MAX_PATH_LENGTH];
 		char m_aPlayer[MAX_NAME_LENGTH];
 
 		int m_Time;
@@ -577,7 +658,9 @@ public:
 		bool HasFile() const { return m_aFilename[0]; }
 	};
 
-	sorted_array<CGhostItem> m_lGhosts;
+	std::vector<CGhostItem> m_vGhosts;
+
+	std::chrono::nanoseconds m_GhostPopulateStartTime{0};
 
 	void GhostlistPopulate();
 	CGhostItem *GetOwnGhost();
@@ -588,10 +671,10 @@ public:
 	int GetCurPopup() { return m_Popup; }
 	bool CanDisplayWarning();
 
-	void PopupWarning(const char *pTopic, const char *pBody, const char *pButton, int64 Duration);
+	void PopupWarning(const char *pTopic, const char *pBody, const char *pButton, std::chrono::nanoseconds Duration);
 
-	int64 m_PopupWarningLastTime;
-	int64 m_PopupWarningDuration;
+	std::chrono::nanoseconds m_PopupWarningLastTime;
+	std::chrono::nanoseconds m_PopupWarningDuration;
 
 	int m_DemoPlayerState;
 	char m_aDemoPlayerPopupHint[256];
@@ -600,6 +683,7 @@ public:
 	{
 		POPUP_NONE = 0,
 		POPUP_FIRST_LAUNCH,
+		POPUP_POINTS,
 		POPUP_CONNECTING,
 		POPUP_MESSAGE,
 		POPUP_DISCONNECTED,
@@ -617,6 +701,7 @@ public:
 		POPUP_DISCONNECT,
 		POPUP_DISCONNECT_DUMMY,
 		POPUP_WARNING,
+		POPUP_SWITCH_SERVER,
 
 		// demo player states
 		DEMOPLAYER_NONE = 0,
@@ -626,6 +711,7 @@ public:
 private:
 	static int GhostlistFetchCallback(const char *pName, int IsDir, int StorageType, void *pUser);
 	void SetMenuPage(int NewPage);
+	bool HandleListInputs(const CUIRect &View, float &ScrollValue, float ScrollAmount, int *pScrollOffset, float ElemHeight, int &SelectedIndex, int NumElems);
 
 	// found in menus_ingame.cpp
 	void RenderInGameNetwork(CUIRect MainView);
@@ -633,8 +719,11 @@ private:
 
 	// found in menus_settings.cpp
 	void RenderSettingsDDNet(CUIRect MainView);
-	void RenderSettingsHUD(CUIRect MainView);
-	ColorHSLA RenderHSLScrollbars(CUIRect *pRect, unsigned int *pColor, bool Alpha = false);
+	void RenderSettingsAppearance(CUIRect MainView);
+	ColorHSLA RenderHSLColorPicker(const CUIRect *pRect, unsigned int *pColor, bool Alpha);
+	ColorHSLA RenderHSLScrollbars(CUIRect *pRect, unsigned int *pColor, bool Alpha = false, bool ClampedLight = false);
+
+	int RenderDropDown(int &CurDropDownState, CUIRect *pRect, int CurSelection, const void **pIDs, const char **pStr, int PickNum, CButtonContainer *pButtonContainer, float &ScrollVal);
 
 	CServerProcess m_ServerProcess;
 };

@@ -1,8 +1,14 @@
 #ifndef GAME_CLIENT_COMPONENTS_BACKGROUND_H
 #define GAME_CLIENT_COMPONENTS_BACKGROUND_H
+
 #include <engine/shared/map.h>
-#include <game/client/component.h>
+
 #include <game/client/components/maplayers.h>
+
+#include <stdint.h>
+
+class CLayers;
+class CMapImages;
 
 // Special value to use background of current map
 #define CURRENT_MAP "%current%"
@@ -20,7 +26,7 @@ protected:
 	char m_aMapName[MAX_MAP_LENGTH];
 
 	//to avoid spam when in menu
-	int64 m_LastLoad;
+	int64_t m_LastLoad;
 
 	//to avoid memory leak when switching to %current%
 	CBackgroundEngineMap *m_pBackgroundMap;
@@ -32,10 +38,11 @@ protected:
 public:
 	CBackground(int MapType = CMapLayers::TYPE_BACKGROUND_FORCE, bool OnlineOnly = true);
 	virtual ~CBackground();
+	virtual int Sizeof() const override { return sizeof(*this); }
 
-	virtual void OnInit();
-	virtual void OnMapLoad();
-	virtual void OnRender();
+	virtual void OnInit() override;
+	virtual void OnMapLoad() override;
+	virtual void OnRender() override;
 
 	void LoadBackground();
 };

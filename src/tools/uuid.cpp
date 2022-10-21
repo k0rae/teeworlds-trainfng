@@ -1,7 +1,9 @@
+#include <base/logger.h>
 #include <engine/shared/uuid_manager.h>
-int main(int argc, char **argv)
+int main(int argc, const char **argv)
 {
-	dbg_logger_stdout();
+	CCmdlineFix CmdlineFix(&argc, &argv);
+	log_set_global_logger_default();
 	if(argc != 2)
 	{
 		dbg_msg("usage", "uuid <NAME>");
@@ -11,4 +13,5 @@ int main(int argc, char **argv)
 	char aBuf[UUID_MAXSTRSIZE];
 	FormatUuid(Uuid, aBuf, sizeof(aBuf));
 	dbg_msg("uuid", "%s", aBuf);
+	return 0;
 }

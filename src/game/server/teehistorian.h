@@ -3,13 +3,12 @@
 
 #include <base/hash.h>
 #include <engine/console.h>
-#include <engine/shared/packer.h>
 #include <engine/shared/protocol.h>
 #include <game/generated/protocol.h>
 
 #include <time.h>
 
-struct CConfiguration;
+class CConfig;
 class CTuningParams;
 class CUuidManager;
 
@@ -34,7 +33,7 @@ public:
 		SHA256_DIGEST m_MapSha256;
 		int m_MapCrc;
 
-		CConfiguration *m_pConfig;
+		CConfig *m_pConfig;
 		CTuningParams *m_pTuning;
 		CUuidManager *m_pUuids;
 	};
@@ -57,15 +56,19 @@ public:
 	void BeginPlayers();
 	void RecordPlayer(int ClientID, const CNetObj_CharacterCore *pChar);
 	void RecordDeadPlayer(int ClientID);
+	void RecordPlayerTeam(int ClientID, int Team);
+	void RecordTeamPractice(int Team, bool Practice);
 	void EndPlayers();
 
 	void BeginInputs();
-	void RecordPlayerInput(int ClientID, const CNetObj_PlayerInput *pInput);
+	void RecordPlayerInput(int ClientID, uint32_t UniqueClientID, const CNetObj_PlayerInput *pInput);
 	void RecordPlayerMessage(int ClientID, const void *pMsg, int MsgSize);
 	void RecordPlayerJoin(int ClientID, int Protocol);
+	void RecordPlayerReady(int ClientID);
 	void RecordPlayerDrop(int ClientID, const char *pReason);
 	void RecordConsoleCommand(int ClientID, int FlagMask, const char *pCmd, IConsole::IResult *pResult);
 	void RecordTestExtra();
+	void RecordPlayerSwap(int ClientID1, int ClientID2);
 	void RecordTeamSaveSuccess(int Team, CUuid SaveID, const char *pTeamSave);
 	void RecordTeamSaveFailure(int Team);
 	void RecordTeamLoadSuccess(int Team, CUuid SaveID, const char *pTeamSave);
@@ -103,14 +106,22 @@ private:
 		NUM_STATES,
 	};
 
-	struct CPlayer
+	struct CTeehistorianPlayer
 	{
 		bool m_Alive;
 		int m_X;
 		int m_Y;
 
 		CNetObj_PlayerInput m_Input;
-		bool m_InputExists;
+		uint32_t m_UniqueClientID;
+
+		// DDNet team
+		int m_Team;
+	};
+
+	struct CTeam
+	{
+		bool m_Practice;
 	};
 
 	WRITE_CALLBACK m_pfnWriteCallback;
@@ -123,7 +134,8 @@ private:
 	int m_Tick;
 	int m_PrevMaxClientID;
 	int m_MaxClientID;
-	CPlayer m_aPrevPlayers[MAX_CLIENTS];
+	CTeehistorianPlayer m_aPrevPlayers[MAX_CLIENTS];
+	CTeam m_aPrevTeams[MAX_CLIENTS];
 };
 
 #endif // GAME_SERVER_TEEHISTORIAN_H

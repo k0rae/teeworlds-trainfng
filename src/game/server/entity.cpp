@@ -3,17 +3,19 @@
 
 #include "entity.h"
 #include "gamecontext.h"
+#include "player.h"
 
 //////////////////////////////////////////////////
 // Entity
 //////////////////////////////////////////////////
-CEntity::CEntity(CGameWorld *pGameWorld, int ObjType)
+CEntity::CEntity(CGameWorld *pGameWorld, int ObjType, vec2 Pos, int ProximityRadius)
 {
 	m_pGameWorld = pGameWorld;
+	m_pCCollision = GameServer()->Collision();
 
 	m_ObjType = ObjType;
-	m_Pos = vec2(0, 0);
-	m_ProximityRadius = 0;
+	m_Pos = Pos;
+	m_ProximityRadius = ProximityRadius;
 
 	m_MarkedForDestroy = false;
 	m_ID = Server()->SnapNewID();
@@ -28,33 +30,25 @@ CEntity::~CEntity()
 	Server()->SnapFreeID(m_ID);
 }
 
-int CEntity::NetworkClipped(int SnappingClient)
+bool CEntity::NetworkClipped(int SnappingClient) const
 {
-	return NetworkClipped(SnappingClient, m_Pos);
+	return ::NetworkClipped(m_pGameWorld->GameServer(), SnappingClient, m_Pos);
 }
 
-int CEntity::NetworkClipped(int SnappingClient, vec2 CheckPos)
+bool CEntity::NetworkClipped(int SnappingClient, vec2 CheckPos) const
 {
-	if(SnappingClient == -1)
-		return 0;
+	return ::NetworkClipped(m_pGameWorld->GameServer(), SnappingClient, CheckPos);
+}
 
-	float dx = GameServer()->m_apPlayers[SnappingClient]->m_ViewPos.x - CheckPos.x;
-	float dy = GameServer()->m_apPlayers[SnappingClient]->m_ViewPos.y - CheckPos.y;
-
-	if(absolute(dx) > 1000.0f || absolute(dy) > 800.0f)
-		return 1;
-
-	if(distance(GameServer()->m_apPlayers[SnappingClient]->m_ViewPos, CheckPos) > 4000.0f)
-		return 1;
-	return 0;
+bool CEntity::NetworkClippedLine(int SnappingClient, vec2 StartPos, vec2 EndPos) const
+{
+	return ::NetworkClippedLine(m_pGameWorld->GameServer(), SnappingClient, StartPos, EndPos);
 }
 
 bool CEntity::GameLayerClipped(vec2 CheckPos)
 {
 	return round_to_int(CheckPos.x) / 32 < -200 || round_to_int(CheckPos.x) / 32 > GameServer()->Collision()->GetWidth() + 200 ||
-			       round_to_int(CheckPos.y) / 32 < -200 || round_to_int(CheckPos.y) / 32 > GameServer()->Collision()->GetHeight() + 200 ?
-		       true :
-		       false;
+	       round_to_int(CheckPos.y) / 32 < -200 || round_to_int(CheckPos.y) / 32 > GameServer()->Collision()->GetHeight() + 200;
 }
 
 bool CEntity::GetNearestAirPos(vec2 Pos, vec2 PrevPos, vec2 *pOutPos)
@@ -68,30 +62,62 @@ bool CEntity::GetNearestAirPos(vec2 Pos, vec2 PrevPos, vec2 *pOutPos)
 	vec2 BlockCenter = vec2(round_to_int(Pos.x), round_to_int(Pos.y)) - PosInBlock + vec2(16.0f, 16.0f);
 
 	*pOutPos = vec2(BlockCenter.x + (PosInBlock.x < 16 ? -2.0f : 1.0f), Pos.y);
-	if(!GameServer()->Collision()->TestBox(*pOutPos, vec2(28.0f, 28.0f)))
+	if(!GameServer()->Collision()->TestBox(*pOutPos, CCharacterCore::PhysicalSizeVec2()))
 		return true;
 
 	*pOutPos = vec2(Pos.x, BlockCenter.y + (PosInBlock.y < 16 ? -2.0f : 1.0f));
-	if(!GameServer()->Collision()->TestBox(*pOutPos, vec2(28.0f, 28.0f)))
+	if(!GameServer()->Collision()->TestBox(*pOutPos, CCharacterCore::PhysicalSizeVec2()))
 		return true;
 
 	*pOutPos = vec2(BlockCenter.x + (PosInBlock.x < 16 ? -2.0f : 1.0f),
 		BlockCenter.y + (PosInBlock.y < 16 ? -2.0f : 1.0f));
-	if(!GameServer()->Collision()->TestBox(*pOutPos, vec2(28.0f, 28.0f)))
-		return true;
-
-	return false;
+	return !GameServer()->Collision()->TestBox(*pOutPos, CCharacterCore::PhysicalSizeVec2());
 }
 
-bool CEntity::GetNearestAirPosPlayer(vec2 PlayerPos, vec2 *OutPos)
+bool CEntity::GetNearestAirPosPlayer(vec2 PlayerPos, vec2 *pOutPos)
 {
 	for(int dist = 5; dist >= -1; dist--)
 	{
-		*OutPos = vec2(PlayerPos.x, PlayerPos.y - dist);
-		if(!GameServer()->Collision()->TestBox(*OutPos, vec2(28.0f, 28.0f)))
+		*pOutPos = vec2(PlayerPos.x, PlayerPos.y - dist);
+		if(!GameServer()->Collision()->TestBox(*pOutPos, CCharacterCore::PhysicalSizeVec2()))
 		{
 			return true;
 		}
 	}
 	return false;
+}
+
+bool NetworkClipped(const CGameContext *pGameServer, int SnappingClient, vec2 CheckPos)
+{
+	if(SnappingClient == SERVER_DEMO_CLIENT || pGameServer->m_apPlayers[SnappingClient]->m_ShowAll)
+		return false;
+
+	float dx = pGameServer->m_apPlayers[SnappingClient]->m_ViewPos.x - CheckPos.x;
+	if(absolute(dx) > pGameServer->m_apPlayers[SnappingClient]->m_ShowDistance.x)
+		return true;
+
+	float dy = pGameServer->m_apPlayers[SnappingClient]->m_ViewPos.y - CheckPos.y;
+	return absolute(dy) > pGameServer->m_apPlayers[SnappingClient]->m_ShowDistance.y;
+}
+
+bool NetworkClippedLine(const CGameContext *pGameServer, int SnappingClient, vec2 StartPos, vec2 EndPos)
+{
+	if(SnappingClient == SERVER_DEMO_CLIENT || pGameServer->m_apPlayers[SnappingClient]->m_ShowAll)
+		return false;
+
+	vec2 &ViewPos = pGameServer->m_apPlayers[SnappingClient]->m_ViewPos;
+	vec2 &ShowDistance = pGameServer->m_apPlayers[SnappingClient]->m_ShowDistance;
+
+	vec2 DistanceToLine, ClosestPoint;
+	if(closest_point_on_line(StartPos, EndPos, ViewPos, ClosestPoint))
+	{
+		DistanceToLine = ViewPos - ClosestPoint;
+	}
+	else
+	{
+		// No line section was passed but two equal points
+		DistanceToLine = ViewPos - StartPos;
+	}
+	float ClippDistance = maximum(ShowDistance.x, ShowDistance.y);
+	return (absolute(DistanceToLine.x) > ClippDistance || absolute(DistanceToLine.y) > ClippDistance);
 }

@@ -4,14 +4,10 @@
 #define ENGINE_SERVER_SERVER_H
 
 #include <base/hash.h>
-#include <base/math.h>
 
-#include <engine/engine.h>
+#include <engine/console.h>
 #include <engine/server.h>
 
-#include <engine/map.h>
-#include <engine/server/register.h>
-#include <engine/shared/console.h>
 #include <engine/shared/demo.h>
 #include <engine/shared/econ.h>
 #include <engine/shared/fifo.h>
@@ -21,9 +17,9 @@
 #include <engine/shared/snapshot.h>
 #include <engine/shared/uuid_manager.h>
 
-#include <base/tl/array.h>
-
 #include <list>
+#include <memory>
+#include <vector>
 
 #include "antibot.h"
 #include "authmanager.h"
@@ -33,11 +29,26 @@
 #include "upnp.h"
 #endif
 
+class CConfig;
+class CHostLookup;
+class CLogMessage;
+class CMsgPacker;
+class CPacker;
+class IEngineMap;
+
 class CSnapIDPool
 {
 	enum
 	{
-		MAX_IDS = 16 * 1024,
+		MAX_IDS = 32 * 1024,
+	};
+
+	// State of a Snap ID
+	enum
+	{
+		ID_FREE = 0,
+		ID_ALLOCATED = 1,
+		ID_TIMED = 2,
 	};
 
 	class CID
@@ -78,8 +89,8 @@ public:
 
 	void InitServerBan(class IConsole *pConsole, class IStorage *pStorage, class CServer *pServer);
 
-	virtual int BanAddr(const NETADDR *pAddr, int Seconds, const char *pReason);
-	virtual int BanRange(const CNetRange *pRange, int Seconds, const char *pReason);
+	int BanAddr(const NETADDR *pAddr, int Seconds, const char *pReason) override;
+	int BanRange(const CNetRange *pRange, int Seconds, const char *pReason) override;
 
 	static void ConBanExt(class IConsole::IResult *pResult, void *pUser);
 	static void ConBanRegion(class IConsole::IResult *pResult, void *pUser);
@@ -88,10 +99,14 @@ public:
 
 class CServer : public IServer
 {
+	friend class CServerLogger;
+
 	class IGameServer *m_pGameServer;
+	class CConfig *m_pConfig;
 	class IConsole *m_pConsole;
 	class IStorage *m_pStorage;
 	class IEngineAntibot *m_pAntibot;
+	class IRegister *m_pRegister;
 
 #if defined(CONF_UPNP)
 	CUPnP m_UPnP;
@@ -107,6 +122,8 @@ class CServer : public IServer
 
 public:
 	class IGameServer *GameServer() { return m_pGameServer; }
+	class CConfig *Config() { return m_pConfig; }
+	const CConfig *Config() const { return m_pConfig; }
 	class IConsole *Console() { return m_pConsole; }
 	class IStorage *Storage() { return m_pStorage; }
 	class IEngineAntibot *Antibot() { return m_pAntibot; }
@@ -148,12 +165,11 @@ public:
 
 		// connection state info
 		int m_State;
-		bool m_SupportsMapSha256;
 		int m_Latency;
 		int m_SnapRate;
 
-		float m_Traffic;
-		int64 m_TrafficSince;
+		double m_Traffic;
+		int64_t m_TrafficSince;
 
 		int m_LastAckedSnapshot;
 		int m_LastInputTick;
@@ -176,6 +192,9 @@ public:
 
 		const IConsole::CCommandInfo *m_pRconCmdToSend;
 
+		bool m_HasPersistentData;
+		void *m_pPersistentData;
+
 		void Reset();
 
 		// DDRace
@@ -195,7 +214,7 @@ public:
 	};
 
 	CClient m_aClients[MAX_CLIENTS];
-	int IdMap[MAX_CLIENTS * VANILLA_MAX_CLIENTS];
+	int m_aIdMap[MAX_CLIENTS * VANILLA_MAX_CLIENTS];
 
 	CSnapshotDelta m_SnapshotDelta;
 	CSnapshotBuilder m_SnapshotBuilder;
@@ -209,7 +228,7 @@ public:
 
 	IEngineMap *m_pMap;
 
-	int64 m_GameStartTime;
+	int64_t m_GameStartTime;
 	//int m_CurrentGameTick;
 
 	enum
@@ -221,83 +240,81 @@ public:
 
 	int m_RunServer;
 
-	int m_MapReload;
+	bool m_MapReload;
 	bool m_ReloadedWhenEmpty;
 	int m_RconClientID;
 	int m_RconAuthLevel;
 	int m_PrintCBIndex;
-
-	int64 m_Lastheartbeat;
-	//static NETADDR4 master_server;
+	char m_aShutdownReason[128];
 
 	enum
 	{
-		SIX = 0,
-		SIXUP,
+		MAP_TYPE_SIX = 0,
+		MAP_TYPE_SIXUP,
+		NUM_MAP_TYPES
 	};
 
-	char m_aCurrentMap[MAX_PATH_LENGTH];
-	SHA256_DIGEST m_aCurrentMapSha256[2];
-	unsigned m_aCurrentMapCrc[2];
-	unsigned char *m_apCurrentMapData[2];
-	unsigned int m_aCurrentMapSize[2];
+	char m_aCurrentMap[IO_MAX_PATH_LENGTH];
+	SHA256_DIGEST m_aCurrentMapSha256[NUM_MAP_TYPES];
+	unsigned m_aCurrentMapCrc[NUM_MAP_TYPES];
+	unsigned char *m_apCurrentMapData[NUM_MAP_TYPES];
+	unsigned int m_aCurrentMapSize[NUM_MAP_TYPES];
 
 	CDemoRecorder m_aDemoRecorder[MAX_CLIENTS + 1];
-	CRegister m_Register;
-	CRegister m_RegSixup;
 	CAuthManager m_AuthManager;
 
-	int m_RconRestrict;
-
-	int64 m_ServerInfoFirstRequest;
+	int64_t m_ServerInfoFirstRequest;
 	int m_ServerInfoNumRequests;
 
 	char m_aErrorShutdownReason[128];
 
-	array<CNameBan> m_aNameBans;
+	std::vector<CNameBan> m_vNameBans;
 
 	CServer();
+	~CServer();
 
 	bool IsClientNameAvailable(int ClientID, const char *pNameRequest);
 	bool SetClientNameImpl(int ClientID, const char *pNameRequest, bool Set);
 
-	virtual bool WouldClientNameChange(int ClientID, const char *pNameRequest);
-	virtual void SetClientName(int ClientID, const char *pName);
-	virtual void SetClientClan(int ClientID, char const *pClan);
-	virtual void SetClientCountry(int ClientID, int Country);
-	virtual void SetClientScore(int ClientID, int Score);
-	virtual void SetClientFlags(int ClientID, int Flags);
+	bool WouldClientNameChange(int ClientID, const char *pNameRequest) override;
+	void SetClientName(int ClientID, const char *pName) override;
+	void SetClientClan(int ClientID, char const *pClan) override;
+	void SetClientCountry(int ClientID, int Country) override;
+	void SetClientScore(int ClientID, int Score) override;
+	void SetClientFlags(int ClientID, int Flags) override;
 
-	void Kick(int ClientID, const char *pReason);
-	void Ban(int ClientID, int Seconds, const char *pReason);
+	void Kick(int ClientID, const char *pReason) override;
+	void Ban(int ClientID, int Seconds, const char *pReason) override;
 
-	void DemoRecorder_HandleAutoStart();
-	bool DemoRecorder_IsRecording();
+	void DemoRecorder_HandleAutoStart() override;
+	bool DemoRecorder_IsRecording() override;
 
 	//int Tick()
-	int64 TickStartTime(int Tick);
+	int64_t TickStartTime(int Tick);
 	//int TickSpeed()
 
 	int Init();
 
-	void SetRconCID(int ClientID);
-	int GetAuthedState(int ClientID);
-	const char *GetAuthName(int ClientID);
-	void GetMapInfo(char *pMapName, int MapNameSize, int *pMapSize, SHA256_DIGEST *pMapSha256, int *pMapCrc);
-	int GetClientInfo(int ClientID, CClientInfo *pInfo);
-	void SetClientDDNetVersion(int ClientID, int DDNetVersion);
-	void GetClientAddr(int ClientID, char *pAddrStr, int Size);
-	const char *ClientName(int ClientID);
-	const char *ClientClan(int ClientID);
-	int ClientCountry(int ClientID);
-	bool ClientIngame(int ClientID);
-	bool ClientAuthed(int ClientID);
-	int Port() const;
-	int MaxClients() const;
-	int ClientCount();
-	int DistinctClientCount();
+	void SendLogLine(const CLogMessage *pMessage);
+	void SetRconCID(int ClientID) override;
+	int GetAuthedState(int ClientID) const override;
+	const char *GetAuthName(int ClientID) const override;
+	void GetMapInfo(char *pMapName, int MapNameSize, int *pMapSize, SHA256_DIGEST *pMapSha256, int *pMapCrc) override;
+	bool GetClientInfo(int ClientID, CClientInfo *pInfo) const override;
+	void SetClientDDNetVersion(int ClientID, int DDNetVersion) override;
+	void GetClientAddr(int ClientID, char *pAddrStr, int Size) const override;
+	const char *ClientName(int ClientID) const override;
+	const char *ClientClan(int ClientID) const override;
+	int ClientCountry(int ClientID) const override;
+	bool ClientIngame(int ClientID) const override;
+	bool ClientAuthed(int ClientID) const override;
+	int Port() const override;
+	int MaxClients() const override;
+	int ClientCount() const override;
+	int DistinctClientCount() const override;
 
-	virtual int SendMsg(CMsgPacker *pMsg, int Flags, int ClientID);
+	int GetClientVersion(int ClientID) const override;
+	int SendMsg(CMsgPacker *pMsg, int Flags, int ClientID) override;
 
 	void DoSnapshot();
 
@@ -313,7 +330,8 @@ public:
 	void SendMapData(int ClientID, int Chunk);
 	void SendConnectionReady(int ClientID);
 	void SendRconLine(int ClientID, const char *pLine);
-	static void SendRconLineAuthed(const char *pLine, void *pUser, bool Highlighted = false);
+	// Accepts -1 as ClientID to mean "all clients with at least auth level admin"
+	void SendRconLogLine(int ClientID, const CLogMessage *pMessage);
 
 	void SendRconCmdAdd(const IConsole::CCommandInfo *pCommandInfo, int ClientID);
 	void SendRconCmdRem(const IConsole::CCommandInfo *pCommandInfo, int ClientID);
@@ -330,11 +348,10 @@ public:
 			CCacheChunk(const void *pData, int Size);
 			CCacheChunk(const CCacheChunk &) = delete;
 
-			int m_DataSize;
-			unsigned char m_aData[NET_MAX_PAYLOAD];
+			std::vector<uint8_t> m_vData;
 		};
 
-		std::list<CCacheChunk> m_lCache;
+		std::list<CCacheChunk> m_Cache;
 
 		CCache();
 		~CCache();
@@ -342,30 +359,31 @@ public:
 		void AddChunk(const void *pData, int Size);
 		void Clear();
 	};
-	CCache m_ServerInfoCache[3 * 2];
-	CCache m_SixupServerInfoCache[2];
+	CCache m_aServerInfoCache[3 * 2];
+	CCache m_aSixupServerInfoCache[2];
 	bool m_ServerInfoNeedsUpdate;
 
-	void ExpireServerInfo();
+	void ExpireServerInfo() override;
 	void CacheServerInfo(CCache *pCache, int Type, bool SendClients);
 	void CacheServerInfoSixup(CCache *pCache, bool SendClients);
 	void SendServerInfo(const NETADDR *pAddr, int Token, int Type, bool SendClients);
 	void GetServerInfoSixup(CPacker *pPacker, int Token, bool SendClients);
 	bool RateLimitServerInfoConnless();
 	void SendServerInfoConnless(const NETADDR *pAddr, int Token, int Type);
+	void UpdateRegisterServerInfo();
 	void UpdateServerInfo(bool Resend = false);
 
 	void PumpNetwork(bool PacketWaiting);
 
-	char *GetMapName();
+	void ChangeMap(const char *pMap) override;
+	const char *GetMapName() const override;
 	int LoadMap(const char *pMapName);
 
-	void SaveDemo(int ClientID, float Time);
-	void StartRecord(int ClientID);
-	void StopRecord(int ClientID);
-	bool IsRecording(int ClientID);
+	void SaveDemo(int ClientID, float Time) override;
+	void StartRecord(int ClientID) override;
+	void StopRecord(int ClientID) override;
+	bool IsRecording(int ClientID) override;
 
-	void InitRegister(CNetServer *pNetServer, IEngineMasterServer *pMasterServer, IConsole *pConsole);
 	int Run();
 
 	static void ConTestingCommands(IConsole::IResult *pResult, void *pUser);
@@ -394,10 +412,10 @@ public:
 	static void ConAddSqlServer(IConsole::IResult *pResult, void *pUserData);
 	static void ConDumpSqlServers(IConsole::IResult *pResult, void *pUserData);
 
+	static void ConchainLoglevel(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainSpecialInfoupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainMaxclientsperipUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainCommandAccessUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
-	static void ConchainConsoleOutputLevelUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
 	void LogoutClient(int ClientID, const char *pReason);
 	void LogoutKey(int Key, const char *pReason);
@@ -406,6 +424,8 @@ public:
 	static void ConchainRconPasswordChange(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainRconModPasswordChange(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainRconHelperPasswordChange(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainMapUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainSixupUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
 #if defined(CONF_FAMILY_UNIX)
 	static void ConchainConnLoggingServerChange(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
@@ -413,49 +433,48 @@ public:
 
 	void RegisterCommands();
 
-	virtual int SnapNewID();
-	virtual void SnapFreeID(int ID);
-	virtual void *SnapNewItem(int Type, int ID, int Size);
-	void SnapSetStaticsize(int ItemType, int Size);
+	int SnapNewID() override;
+	void SnapFreeID(int ID) override;
+	void *SnapNewItem(int Type, int ID, int Size) override;
+	void SnapSetStaticsize(int ItemType, int Size) override;
 
 	// DDRace
 
-	void GetClientAddr(int ClientID, NETADDR *pAddr);
+	void GetClientAddr(int ClientID, NETADDR *pAddr) const override;
 	int m_aPrevStates[MAX_CLIENTS];
-	const char *GetAnnouncementLine(char const *FileName);
+	const char *GetAnnouncementLine(char const *pFileName) override;
 	unsigned m_AnnouncementLastLine;
-	void RestrictRconOutput(int ClientID) { m_RconRestrict = ClientID; }
 
-	virtual int *GetIdMap(int ClientID);
+	int *GetIdMap(int ClientID) override;
 
 	void InitDnsbl(int ClientID);
-	bool DnsblWhite(int ClientID)
+	bool DnsblWhite(int ClientID) override
 	{
 		return m_aClients[ClientID].m_DnsblState == CClient::DNSBL_STATE_NONE ||
 		       m_aClients[ClientID].m_DnsblState == CClient::DNSBL_STATE_WHITELISTED;
 	}
-	bool DnsblPending(int ClientID)
+	bool DnsblPending(int ClientID) override
 	{
 		return m_aClients[ClientID].m_DnsblState == CClient::DNSBL_STATE_PENDING;
 	}
-	bool DnsblBlack(int ClientID)
+	bool DnsblBlack(int ClientID) override
 	{
 		return m_aClients[ClientID].m_DnsblState == CClient::DNSBL_STATE_BLACKLISTED;
 	}
 
 	void AuthRemoveKey(int KeySlot);
-	bool ClientPrevIngame(int ClientID) { return m_aPrevStates[ClientID] == CClient::STATE_INGAME; };
-	const char *GetNetErrorString(int ClientID) { return m_NetServer.ErrorString(ClientID); };
-	void ResetNetErrorString(int ClientID) { m_NetServer.ResetErrorString(ClientID); };
-	bool SetTimedOut(int ClientID, int OrigID);
-	void SetTimeoutProtected(int ClientID) { m_NetServer.SetTimeoutProtected(ClientID); };
+	bool ClientPrevIngame(int ClientID) override { return m_aPrevStates[ClientID] == CClient::STATE_INGAME; }
+	const char *GetNetErrorString(int ClientID) override { return m_NetServer.ErrorString(ClientID); }
+	void ResetNetErrorString(int ClientID) override { m_NetServer.ResetErrorString(ClientID); }
+	bool SetTimedOut(int ClientID, int OrigID) override;
+	void SetTimeoutProtected(int ClientID) override { m_NetServer.SetTimeoutProtected(ClientID); }
 
-	void SendMsgRaw(int ClientID, const void *pData, int Size, int Flags);
+	void SendMsgRaw(int ClientID, const void *pData, int Size, int Flags) override;
 
 	bool ErrorShutdown() const { return m_aErrorShutdownReason[0] != 0; }
-	void SetErrorShutdown(const char *pReason);
+	void SetErrorShutdown(const char *pReason) override;
 
-	bool IsSixup(int ClientID) const { return m_aClients[ClientID].m_Sixup; }
+	bool IsSixup(int ClientID) const override { return ClientID != SERVER_DEMO_CLIENT && m_aClients[ClientID].m_Sixup; }
 
 #ifdef CONF_FAMILY_UNIX
 	enum CONN_LOGGING_CMD
@@ -464,7 +483,7 @@ public:
 		CLOSE_SESSION = 2,
 	};
 
-	void SendConnLoggingCommand(CONN_LOGGING_CMD cmd, const NETADDR *pAddr);
+	void SendConnLoggingCommand(CONN_LOGGING_CMD Cmd, const NETADDR *pAddr);
 #endif
 };
 

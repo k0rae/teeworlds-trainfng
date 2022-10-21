@@ -2,6 +2,9 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #ifndef GAME_CLIENT_COMPONENTS_MAPIMAGES_H
 #define GAME_CLIENT_COMPONENTS_MAPIMAGES_H
+
+#include <engine/graphics.h>
+
 #include <game/client/component.h>
 
 enum EMapImageEntityLayerType
@@ -24,17 +27,12 @@ enum EMapImageModType
 	MAP_IMAGE_MOD_TYPE_BLOCKWORLDS,
 	MAP_IMAGE_MOD_TYPE_FNG,
 	MAP_IMAGE_MOD_TYPE_VANILLA,
+	MAP_IMAGE_MOD_TYPE_FDDRACE,
 
 	MAP_IMAGE_MOD_TYPE_COUNT,
 };
 
-static const char *const gs_aModEntitiesNames[] = {
-	"ddnet",
-	"ddrace",
-	"race",
-	"blockworlds",
-	"fng",
-	"vanilla"};
+extern const char *const gs_apModEntitiesNames[];
 
 class CMapImages : public CComponent
 {
@@ -45,7 +43,7 @@ class CMapImages : public CComponent
 	int m_aTextureUsedByTileOrQuadLayerFlag[64]; // 0: nothing, 1(as flag): tile layer, 2(as flag): quad layer
 	int m_Count;
 
-	char m_aEntitiesPath[MAX_PATH_LENGTH];
+	char m_aEntitiesPath[IO_MAX_PATH_LENGTH];
 
 	bool HasFrontLayer(EMapImageModType ModType);
 	bool HasSpeedupLayer(EMapImageModType ModType);
@@ -55,14 +53,15 @@ class CMapImages : public CComponent
 
 public:
 	CMapImages();
-	CMapImages(int ImageSize);
+	CMapImages(int TextureSize);
+	virtual int Sizeof() const override { return sizeof(*this); }
 
 	IGraphics::CTextureHandle Get(int Index) const { return m_aTextures[Index]; }
 	int Num() const { return m_Count; }
 
 	void OnMapLoadImpl(class CLayers *pLayers, class IMap *pMap);
-	virtual void OnMapLoad();
-	virtual void OnInit();
+	virtual void OnMapLoad() override;
+	virtual void OnInit() override;
 	void LoadBackground(class CLayers *pLayers, class IMap *pMap);
 
 	// DDRace
@@ -73,15 +72,15 @@ public:
 	IGraphics::CTextureHandle GetOverlayTop();
 	IGraphics::CTextureHandle GetOverlayCenter();
 
-	void SetTextureScale(int Size);
+	void SetTextureScale(int Scale);
 	int GetTextureScale();
 
 	void ChangeEntitiesPath(const char *pPath);
 
 private:
-	bool m_EntitiesIsLoaded[MAP_IMAGE_MOD_TYPE_COUNT * 2];
+	bool m_aEntitiesIsLoaded[MAP_IMAGE_MOD_TYPE_COUNT * 2];
 	bool m_SpeedupArrowIsLoaded;
-	IGraphics::CTextureHandle m_EntitiesTextures[MAP_IMAGE_MOD_TYPE_COUNT * 2][MAP_IMAGE_ENTITY_LAYER_TYPE_COUNT];
+	IGraphics::CTextureHandle m_aaEntitiesTextures[MAP_IMAGE_MOD_TYPE_COUNT * 2][MAP_IMAGE_ENTITY_LAYER_TYPE_COUNT];
 	IGraphics::CTextureHandle m_SpeedupArrowTexture;
 	IGraphics::CTextureHandle m_OverlayBottomTexture;
 	IGraphics::CTextureHandle m_OverlayTopTexture;

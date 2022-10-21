@@ -2,7 +2,9 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #ifndef GAME_CLIENT_COMPONENTS_SOUNDS_H
 #define GAME_CLIENT_COMPONENTS_SOUNDS_H
-#include <engine/engine.h>
+
+#include <base/vmath.h>
+#include <engine/shared/jobs.h>
 #include <engine/sound.h>
 #include <game/client/component.h>
 
@@ -13,7 +15,7 @@ class CSoundLoading : public IJob
 
 public:
 	CSoundLoading(CGameClient *pGameClient, bool Render);
-	void Run();
+	void Run() override;
 };
 
 class CSounds : public CComponent
@@ -28,7 +30,7 @@ class CSounds : public CComponent
 		int m_SetId;
 	} m_aQueue[QUEUE_SIZE];
 	int m_QueuePos;
-	int64 m_QueueWaitTime;
+	int64_t m_QueueWaitTime;
 	std::shared_ptr<CSoundLoading> m_pSoundJob;
 	bool m_WaitForSoundJob;
 
@@ -50,10 +52,11 @@ public:
 		CHN_MAPSOUND,
 	};
 
-	virtual void OnInit();
-	virtual void OnReset();
-	virtual void OnStateChange(int NewState, int OldState);
-	virtual void OnRender();
+	virtual int Sizeof() const override { return sizeof(*this); }
+	virtual void OnInit() override;
+	virtual void OnReset() override;
+	virtual void OnStateChange(int NewState, int OldState) override;
+	virtual void OnRender() override;
 
 	void ClearQueue();
 	void Enqueue(int Channel, int SetId);
@@ -61,6 +64,7 @@ public:
 	void PlayAt(int Channel, int SetId, float Vol, vec2 Pos);
 	void PlayAndRecord(int Channel, int SetId, float Vol, vec2 Pos);
 	void Stop(int SetId);
+	bool IsPlaying(int SetId);
 
 	ISound::CVoiceHandle PlaySample(int Channel, int SampleId, float Vol, int Flags = 0);
 	ISound::CVoiceHandle PlaySampleAt(int Channel, int SampleId, float Vol, vec2 Pos, int Flags = 0);

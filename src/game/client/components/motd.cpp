@@ -6,7 +6,6 @@
 #include <engine/textrender.h>
 
 #include <game/client/gameclient.h>
-#include <game/generated/client_data.h>
 #include <game/generated/protocol.h>
 
 #include "motd.h"
@@ -42,12 +41,7 @@ void CMotd::OnRender()
 	float x = Width / 2 - w / 2;
 	float y = 150.0f;
 
-	Graphics()->BlendNormal();
-	Graphics()->TextureClear();
-	Graphics()->QuadsBegin();
-	Graphics()->SetColor(0, 0, 0, 0.5f);
-	RenderTools()->DrawRoundRect(x, y, w, h, 40.0f);
-	Graphics()->QuadsEnd();
+	Graphics()->DrawRect(x, y, w, h, ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f), IGraphics::CORNER_ALL, 40.0f);
 
 	TextRender()->Text(0, x + 40.0f, y + 40.0f, 32.0f, m_aServerMotd, w - 80.0f);
 }
@@ -80,14 +74,14 @@ void CMotd::OnMessage(int MsgType, void *pRawMsg)
 			if(g_Config.m_ClPrintMotd && m_aServerMotd[k] == '\n')
 			{
 				m_aServerMotd[k] = '\0';
-				m_pClient->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "motd", pLast, true);
+				m_pClient->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "motd", pLast, color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageHighlightColor)));
 				m_aServerMotd[k] = '\n';
 				pLast = m_aServerMotd + k + 1;
 			}
 		}
 		m_aServerMotd[sizeof(m_aServerMotd) - 1] = '\0';
 		if(g_Config.m_ClPrintMotd && *pLast != '\0')
-			m_pClient->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "motd", pLast, true);
+			m_pClient->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "motd", pLast, color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageHighlightColor)));
 
 		if(m_aServerMotd[0] && g_Config.m_ClMotdTime)
 			m_ServerMotdTime = time() + time_freq() * g_Config.m_ClMotdTime;

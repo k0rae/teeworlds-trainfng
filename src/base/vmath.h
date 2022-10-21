@@ -22,70 +22,74 @@ public:
 		T y, v;
 	};
 
-	vector2_base() {}
-	vector2_base(T nx, T ny)
+	constexpr vector2_base() :
+		x(T()), y(T())
 	{
-		x = nx;
-		y = ny;
+	}
+
+	constexpr vector2_base(T nx, T ny) :
+		x(nx), y(ny)
+	{
 	}
 
 	vector2_base operator-() const { return vector2_base(-x, -y); }
-	vector2_base operator-(const vector2_base &v) const { return vector2_base(x - v.x, y - v.y); }
-	vector2_base operator+(const vector2_base &v) const { return vector2_base(x + v.x, y + v.y); }
-	vector2_base operator*(const T v) const { return vector2_base(x * v, y * v); }
-	vector2_base operator*(const vector2_base &v) const { return vector2_base(x * v.x, y * v.y); }
-	vector2_base operator/(const T v) const { return vector2_base(x / v, y / v); }
-	vector2_base operator/(const vector2_base &v) const { return vector2_base(x / v.x, y / v.y); }
+	vector2_base operator-(const vector2_base &vec) const { return vector2_base(x - vec.x, y - vec.y); }
+	vector2_base operator+(const vector2_base &vec) const { return vector2_base(x + vec.x, y + vec.y); }
+	vector2_base operator*(const T rhs) const { return vector2_base(x * rhs, y * rhs); }
+	vector2_base operator*(const vector2_base &vec) const { return vector2_base(x * vec.x, y * vec.y); }
+	vector2_base operator/(const T rhs) const { return vector2_base(x / rhs, y / rhs); }
+	vector2_base operator/(const vector2_base &vec) const { return vector2_base(x / vec.x, y / vec.y); }
 
-	const vector2_base &operator+=(const vector2_base &v)
+	const vector2_base &operator+=(const vector2_base &vec)
 	{
-		x += v.x;
-		y += v.y;
+		x += vec.x;
+		y += vec.y;
 		return *this;
 	}
-	const vector2_base &operator-=(const vector2_base &v)
+	const vector2_base &operator-=(const vector2_base &vec)
 	{
-		x -= v.x;
-		y -= v.y;
+		x -= vec.x;
+		y -= vec.y;
 		return *this;
 	}
-	const vector2_base &operator*=(const T v)
+	const vector2_base &operator*=(const T rhs)
 	{
-		x *= v;
-		y *= v;
+		x *= rhs;
+		y *= rhs;
 		return *this;
 	}
-	const vector2_base &operator*=(const vector2_base &v)
+	const vector2_base &operator*=(const vector2_base &vec)
 	{
-		x *= v.x;
-		y *= v.y;
+		x *= vec.x;
+		y *= vec.y;
 		return *this;
 	}
-	const vector2_base &operator/=(const T v)
+	const vector2_base &operator/=(const T rhs)
 	{
-		x /= v;
-		y /= v;
+		x /= rhs;
+		y /= rhs;
 		return *this;
 	}
-	const vector2_base &operator/=(const vector2_base &v)
+	const vector2_base &operator/=(const vector2_base &vec)
 	{
-		x /= v.x;
-		y /= v.y;
+		x /= vec.x;
+		y /= vec.y;
 		return *this;
 	}
 
-	bool operator==(const vector2_base &v) const { return x == v.x && y == v.y; } //TODO: do this with an eps instead
-	bool operator!=(const vector2_base &v) const { return x != v.x || y != v.y; }
-
-	operator const T *() { return &x; }
+	bool operator==(const vector2_base &vec) const { return x == vec.x && y == vec.y; } //TODO: do this with an eps instead
+	bool operator!=(const vector2_base &vec) const { return x != vec.x || y != vec.y; }
 
 	T &operator[](const int index) { return index ? y : x; }
 };
 
 template<typename T>
-inline T length(const vector2_base<T> &a)
+inline vector2_base<T> rotate(const vector2_base<T> &a, float angle)
 {
-	return sqrtf(a.x * a.x + a.y * a.y);
+	angle = angle * pi / 180.0f;
+	float s = sinf(angle);
+	float c = cosf(angle);
+	return vector2_base<T>((T)(c * a.x - s * a.y), (T)(s * a.x + c * a.y));
 }
 
 template<typename T>
@@ -100,17 +104,43 @@ inline T dot(const vector2_base<T> a, const vector2_base<T> &b)
 	return a.x * b.x + a.y * b.y;
 }
 
-template<typename T>
-inline vector2_base<T> normalize(const vector2_base<T> &v)
+inline float length(const vector2_base<float> &a)
 {
-	T l = (T)(1.0f / sqrtf(v.x * v.x + v.y * v.y));
-	return vector2_base<T>(v.x * l, v.y * l);
+	return sqrtf(a.x * a.x + a.y * a.y);
+}
+
+inline float angle(const vector2_base<float> &a)
+{
+	if(a.x == 0 && a.y == 0)
+		return 0.0f;
+	else if(a.x == 0)
+		return a.y < 0 ? -pi / 2 : pi / 2;
+	float result = atanf(a.y / a.x);
+	if(a.x < 0)
+		result = result + pi;
+	return result;
 }
 
 template<typename T>
 inline vector2_base<T> normalize_pre_length(const vector2_base<T> &v, T len)
 {
+	if(len == 0)
+		return vector2_base<T>();
 	return vector2_base<T>(v.x / len, v.y / len);
+}
+
+inline vector2_base<float> normalize(const vector2_base<float> &v)
+{
+	float divisor = sqrtf(v.x * v.x + v.y * v.y);
+	if(divisor == 0.0f)
+		return vector2_base<float>(0.0f, 0.0f);
+	float l = (float)(1.0f / divisor);
+	return vector2_base<float>(v.x * l, v.y * l);
+}
+
+inline vector2_base<float> direction(float angle)
+{
+	return vector2_base<float>(cosf(angle), sinf(angle));
 }
 
 typedef vector2_base<float> vec2;
@@ -118,16 +148,16 @@ typedef vector2_base<bool> bvec2;
 typedef vector2_base<int> ivec2;
 
 template<typename T>
-inline bool closest_point_on_line(vector2_base<T> line_point0, vector2_base<T> line_point1, vector2_base<T> target_point, vector2_base<T> &out_pos)
+inline bool closest_point_on_line(vector2_base<T> line_pointA, vector2_base<T> line_pointB, vector2_base<T> target_point, vector2_base<T> &out_pos)
 {
-	vector2_base<T> c = target_point - line_point0;
-	vector2_base<T> v = (line_point1 - line_point0);
-	T d = length(line_point0 - line_point1);
-	if(d > 0)
+	vector2_base<T> AB = line_pointB - line_pointA;
+	T SquaredMagnitudeAB = dot(AB, AB);
+	if(SquaredMagnitudeAB > 0)
 	{
-		v = normalize_pre_length<T>(v, d);
-		T t = dot(v, c) / d;
-		out_pos = mix(line_point0, line_point1, clamp(t, (T)0, (T)1));
+		vector2_base<T> AP = target_point - line_pointA;
+		T APdotAB = dot(AP, AB);
+		T t = APdotAB / SquaredMagnitudeAB;
+		out_pos = line_pointA + AB * clamp(t, (T)0, (T)1);
 		return true;
 	}
 	else
@@ -141,95 +171,81 @@ class vector3_base
 public:
 	union
 	{
-		T x, r, h;
+		T x, r, h, u;
 	};
 	union
 	{
-		T y, g, s;
+		T y, g, s, v;
 	};
 	union
 	{
-		T z, b, v, l;
+		T z, b, l, w;
 	};
 
-	vector3_base() {}
-	vector3_base(T nx, T ny, T nz)
+	vector3_base() :
+		x(T()), y(T()), z(T())
 	{
-		x = nx;
-		y = ny;
-		z = nz;
 	}
 
-	vector3_base operator-(const vector3_base &v) const { return vector3_base(x - v.x, y - v.y, z - v.z); }
+	vector3_base(T nx, T ny, T nz) :
+		x(nx), y(ny), z(nz)
+	{
+	}
+
+	vector3_base operator-(const vector3_base &vec) const { return vector3_base(x - vec.x, y - vec.y, z - vec.z); }
 	vector3_base operator-() const { return vector3_base(-x, -y, -z); }
-	vector3_base operator+(const vector3_base &v) const { return vector3_base(x + v.x, y + v.y, z + v.z); }
-	vector3_base operator*(const T v) const { return vector3_base(x * v, y * v, z * v); }
-	vector3_base operator*(const vector3_base &v) const { return vector3_base(x * v.x, y * v.y, z * v.z); }
-	vector3_base operator/(const T v) const { return vector3_base(x / v, y / v, z / v); }
-	vector3_base operator/(const vector3_base &v) const { return vector3_base(x / v.x, y / v.y, z / v.z); }
+	vector3_base operator+(const vector3_base &vec) const { return vector3_base(x + vec.x, y + vec.y, z + vec.z); }
+	vector3_base operator*(const T rhs) const { return vector3_base(x * rhs, y * rhs, z * rhs); }
+	vector3_base operator*(const vector3_base &vec) const { return vector3_base(x * vec.x, y * vec.y, z * vec.z); }
+	vector3_base operator/(const T rhs) const { return vector3_base(x / rhs, y / rhs, z / rhs); }
+	vector3_base operator/(const vector3_base &vec) const { return vector3_base(x / vec.x, y / vec.y, z / vec.z); }
 
-	const vector3_base &operator+=(const vector3_base &v)
+	const vector3_base &operator+=(const vector3_base &vec)
 	{
-		x += v.x;
-		y += v.y;
-		z += v.z;
+		x += vec.x;
+		y += vec.y;
+		z += vec.z;
 		return *this;
 	}
-	const vector3_base &operator-=(const vector3_base &v)
+	const vector3_base &operator-=(const vector3_base &vec)
 	{
-		x -= v.x;
-		y -= v.y;
-		z -= v.z;
+		x -= vec.x;
+		y -= vec.y;
+		z -= vec.z;
 		return *this;
 	}
-	const vector3_base &operator*=(const T v)
+	const vector3_base &operator*=(const T rhs)
 	{
-		x *= v;
-		y *= v;
-		z *= v;
+		x *= rhs;
+		y *= rhs;
+		z *= rhs;
 		return *this;
 	}
-	const vector3_base &operator*=(const vector3_base &v)
+	const vector3_base &operator*=(const vector3_base &vec)
 	{
-		x *= v.x;
-		y *= v.y;
-		z *= v.z;
+		x *= vec.x;
+		y *= vec.y;
+		z *= vec.z;
 		return *this;
 	}
-	const vector3_base &operator/=(const T v)
+	const vector3_base &operator/=(const T rhs)
 	{
-		x /= v;
-		y /= v;
-		z /= v;
+		x /= rhs;
+		y /= rhs;
+		z /= rhs;
 		return *this;
 	}
-	const vector3_base &operator/=(const vector3_base &v)
+	const vector3_base &operator/=(const vector3_base &vec)
 	{
-		x /= v.x;
-		y /= v.y;
-		z /= v.z;
+		x /= vec.x;
+		y /= vec.y;
+		z /= vec.z;
 		return *this;
 	}
 
-	bool operator==(const vector3_base &v) const { return x == v.x && y == v.y && z == v.z; } //TODO: do this with an eps instead
-
-	operator const T *() { return &x; }
+	bool operator==(const vector3_base &vec) const { return x == vec.x && y == vec.y && z == vec.z; } //TODO: do this with an eps instead
+	bool operator!=(const vector3_base &vec) const { return x != vec.x || y != vec.y || z != vec.z; }
 };
-
-template<typename T>
-inline T length(const vector3_base<T> &a)
-{
-	return sqrtf(a.x * a.x + a.y * a.y + a.z * a.z);
-}
-
-template<typename T>
-inline vector2_base<T> rotate(const vector2_base<T> &a, float angle)
-{
-	angle = angle * pi / 180.0f;
-	float s = sinf(angle);
-	float c = cosf(angle);
-	return vector2_base<T>((T)(c * a.x - s * a.y), (T)(s * a.x + c * a.y));
-}
 
 template<typename T>
 inline T distance(const vector3_base<T> &a, const vector3_base<T> &b)
@@ -244,19 +260,27 @@ inline T dot(const vector3_base<T> &a, const vector3_base<T> &b)
 }
 
 template<typename T>
-inline vector3_base<T> normalize(const vector3_base<T> &v)
-{
-	T l = (T)(1.0f / sqrtf(v.x * v.x + v.y * v.y + v.z * v.z));
-	return vector3_base<T>(v.x * l, v.y * l, v.z * l);
-}
-
-template<typename T>
 inline vector3_base<T> cross(const vector3_base<T> &a, const vector3_base<T> &b)
 {
 	return vector3_base<T>(
 		a.y * b.z - a.z * b.y,
 		a.z * b.x - a.x * b.z,
 		a.x * b.y - a.y * b.x);
+}
+
+//
+inline float length(const vector3_base<float> &a)
+{
+	return sqrtf(a.x * a.x + a.y * a.y + a.z * a.z);
+}
+
+inline vector3_base<float> normalize(const vector3_base<float> &v)
+{
+	float divisor = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+	if(divisor == 0.0f)
+		return vector3_base<float>(0.0f, 0.0f, 0.0f);
+	float l = (float)(1.0f / divisor);
+	return vector3_base<float>(v.x * l, v.y * l, v.z * l);
 }
 
 typedef vector3_base<float> vec3;
@@ -286,75 +310,74 @@ public:
 		T w, a;
 	};
 
-	vector4_base() {}
-	vector4_base(T nx, T ny, T nz, T nw)
+	vector4_base() :
+		x(T()), y(T()), z(T()), w(T())
 	{
-		x = nx;
-		y = ny;
-		z = nz;
-		w = nw;
 	}
 
-	vector4_base operator+(const vector4_base &v) const { return vector4_base(x + v.x, y + v.y, z + v.z, w + v.w); }
-	vector4_base operator-(const vector4_base &v) const { return vector4_base(x - v.x, y - v.y, z - v.z, w - v.w); }
+	vector4_base(T nx, T ny, T nz, T nw) :
+		x(nx), y(ny), z(nz), w(nw)
+	{
+	}
+
+	vector4_base operator+(const vector4_base &vec) const { return vector4_base(x + vec.x, y + vec.y, z + vec.z, w + vec.w); }
+	vector4_base operator-(const vector4_base &vec) const { return vector4_base(x - vec.x, y - vec.y, z - vec.z, w - vec.w); }
 	vector4_base operator-() const { return vector4_base(-x, -y, -z, -w); }
-	vector4_base operator*(const vector4_base &v) const { return vector4_base(x * v.x, y * v.y, z * v.z, w * v.w); }
-	vector4_base operator*(const T v) const { return vector4_base(x * v, y * v, z * v, w * v); }
-	vector4_base operator/(const vector4_base &v) const { return vector4_base(x / v.x, y / v.y, z / v.z, w / v.w); }
-	vector4_base operator/(const T v) const { return vector4_base(x / v, y / v, z / v, w / v); }
+	vector4_base operator*(const vector4_base &vec) const { return vector4_base(x * vec.x, y * vec.y, z * vec.z, w * vec.w); }
+	vector4_base operator*(const T rhs) const { return vector4_base(x * rhs, y * rhs, z * rhs, w * rhs); }
+	vector4_base operator/(const vector4_base &vec) const { return vector4_base(x / vec.x, y / vec.y, z / vec.z, w / vec.w); }
+	vector4_base operator/(const T vec) const { return vector4_base(x / vec, y / vec, z / vec, w / vec); }
 
-	const vector4_base &operator+=(const vector4_base &v)
+	const vector4_base &operator+=(const vector4_base &vec)
 	{
-		x += v.x;
-		y += v.y;
-		z += v.z;
-		w += v.w;
+		x += vec.x;
+		y += vec.y;
+		z += vec.z;
+		w += vec.w;
 		return *this;
 	}
-	const vector4_base &operator-=(const vector4_base &v)
+	const vector4_base &operator-=(const vector4_base &vec)
 	{
-		x -= v.x;
-		y -= v.y;
-		z -= v.z;
-		w -= v.w;
+		x -= vec.x;
+		y -= vec.y;
+		z -= vec.z;
+		w -= vec.w;
 		return *this;
 	}
-	const vector4_base &operator*=(const T v)
+	const vector4_base &operator*=(const T rhs)
 	{
-		x *= v;
-		y *= v;
-		z *= v;
-		w *= v;
+		x *= rhs;
+		y *= rhs;
+		z *= rhs;
+		w *= rhs;
 		return *this;
 	}
-	const vector4_base &operator*=(const vector4_base &v)
+	const vector4_base &operator*=(const vector4_base &vec)
 	{
-		x *= v.x;
-		y *= v.y;
-		z *= v.z;
-		w *= v.w;
+		x *= vec.x;
+		y *= vec.y;
+		z *= vec.z;
+		w *= vec.w;
 		return *this;
 	}
-	const vector4_base &operator/=(const T v)
+	const vector4_base &operator/=(const T rhs)
 	{
-		x /= v;
-		y /= v;
-		z /= v;
-		w /= v;
+		x /= rhs;
+		y /= rhs;
+		z /= rhs;
+		w /= rhs;
 		return *this;
 	}
-	const vector4_base &operator/=(const vector4_base &v)
+	const vector4_base &operator/=(const vector4_base &vec)
 	{
-		x /= v.x;
-		y /= v.y;
-		z /= v.z;
-		w /= v.w;
+		x /= vec.x;
+		y /= vec.y;
+		z /= vec.z;
+		w /= vec.w;
 		return *this;
 	}
 
-	bool operator==(const vector4_base &v) const { return x == v.x && y == v.y && z == v.z && w == v.w; } //TODO: do this with an eps instead
-
-	operator const T *() { return &x; }
+	bool operator==(const vector4_base &vec) const { return x == vec.x && y == vec.y && z == vec.z && w == vec.w; } //TODO: do this with an eps instead
 };
 
 typedef vector4_base<float> vec4;

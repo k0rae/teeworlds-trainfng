@@ -2,10 +2,11 @@
 #originally created by:
 #	HeroiAmarelo
 #modified by:
-#	HeroiAmarelo	2011-07-15 00:35:23
-#	HeroiAmarelo	2012-08-01 15:47:40
-#	HeroiAmarelo	2012-10-18 23:56:32
-#	Rockus			2018-04-06
+#	HeroiAmarelo	2011-07-15
+#	HeroiAmarelo	2012-08-01
+#	HeroiAmarelo	2012-10-18
+#	Rockus		2018-04-06
+#	rockuS		2022-02-10
 ##### /authors #####
 
 ##### translated strings #####
@@ -70,9 +71,6 @@ Blue team wins!
 Body
 == Corpo
 
-Borderless window
-== Janela S/ Bordas
-
 Call vote
 == Votação
 
@@ -90,9 +88,6 @@ Client
 
 Close
 == Fechar
-
-Compatible version
-== Versão compatível
 
 Connect
 == Ligar
@@ -153,9 +148,6 @@ Dynamic Camera
 
 Emoticon
 == Emoticon
-
-Enter
-== Entrar
 
 Error
 == Erro
@@ -259,12 +251,6 @@ MOTD
 Map
 == Mapa
 
-Maximum ping:
-== Ping máximo:
-
-Mouse sens.
-== Sens. do rato
-
 Move left
 == Mover para a esquerda
 
@@ -362,9 +348,6 @@ Red team wins!
 Refresh
 == Atualizar
 
-Refreshing master servers
-== A Atualizar servidores
-
 Remote console
 == Remote console
 
@@ -436,9 +419,6 @@ Show name plates
 
 Show only chat messages from friends
 == Mostrar apenas mensagens dos amigos no chat
-
-Show only supported
-== Mostrar apenas suportado
 
 Skins
 == Skins
@@ -653,9 +633,6 @@ Map sound volume
 Countries
 == Países
 
-Background (entities)
-== Plano de fundo (entidades)
-
 Show kill messages
 == Mostrar mensagens de morte
 
@@ -671,17 +648,11 @@ No updates available
 Enable server message sound
 == Ativar o som de mensagem do servidor
 
-second
-== segundo
-
 Show votes window after voting
 == Mostrar janela de voto depois de votar
 
 HUD
 == HUD
-
-Look out!
-== Cuidado!
 
 Show names in chat in team colors
 == Mostrar nomes no chat com cores da equipa
@@ -692,12 +663,6 @@ Select a name
 Enable team chat sound
 == Ativar o som do chat de equipa
 
-We will win
-== Nós vamos ganhar
-
-Hi o/
-== Olá o/
-
 Deaths
 == Mortes
 
@@ -707,14 +672,8 @@ Enable game sounds
 DDNet Client needs to be restarted to complete update!
 == O cliente DDNet precisa de ser reiniciado para completar a atualização!
 
-Spectator
-== Espectador
-
 Please use a different name
 == Por favor usa um nome diferente
-
-Show console window
-== Mostrar a janela da consola
 
 Show others
 == Mostrar os outros
@@ -736,9 +695,6 @@ Follow
 
 Enable gun sound
 == Ativar o som da arma
-
-Show health + ammo
-== Mostrar saúde + munição
 
 Team message
 == Mensagem de equipa
@@ -764,11 +720,8 @@ Remove chat
 Check now
 == Verifica agora
 
-Background (regular)
-== Plano de fundo (regular)
-
 AntiPing: predict other players
-== Antiping: prever os outros jogadores
+== AntiPing: prever os outros jogadores
 
 Automatically take statboard screenshot
 == Tirar automaticamente screenshot da statboard
@@ -803,14 +756,8 @@ Default zoom
 Show score
 == Mostrar pontuação
 
-Show client IDs in Scoreboard
-== Mostrar os IDs do cliente na tabela de pontuação
-
 Max CSVs
 == CSVs máximos
-
-seconds
-== segundos
 
 Use DDRace Scoreboard
 == Usa a tabela de pontuações de DDRace
@@ -848,9 +795,6 @@ Exclude
 Enable highlighted chat sound
 == Ativar o som do chat em destaque
 
-Hello and welcome
-== Olá e bem-vindo
-
 AntiPing: predict weapons
 == AntiPing: prever as armas
 
@@ -860,34 +804,222 @@ DDNet Client updated!
 Highlighted message
 == Mensagem em destaque
 
-Friend
-== Amigo
-
 Switch weapon when out of ammo
 == Mudar de arma quando ficar sem munição
 
 AntiPing: predict grenade paths
 == Antiping: prever os caminhos da granada
 
-Inner color
-== Cor interior
+Saving ddnet-settings.cfg failed
+== Falha ao guardar ddnet-settings.cfg
 
-Downloading ddnet-info.json failed
-== 
+Warning
+== Aviso
+
+Reconnect in %d sec
+== Reconectar em %d seg
+
+File already exists, do you want to overwrite it?
+== O ficheiro já existe, queres substituí-lo?
+
+Disconnect Dummy
+== Desconectar Dummy
+
+Are you sure that you want to disconnect your dummy?
+== Tens a certeza que queres desconectar o teu dummy?
+
+Welcome to DDNet
+== Bem-vindo à DDNet
+
+It's recommended that you check the settings to adjust them to your liking before joining a server.
+== É recomendado que verifiques as definições para ajustá-las a teu gosto antes de te juntares a um servidor.
+
+Please enter your nickname below.
+== Por favor introduz o teu nome abaixo.
+
+Existing Player
+== Jogador Existente
+
+Your nickname '%s' is already used (%d points). Do you still want to use it?
+== O teu nome '%s' já está em uso (%d points). Queres usá-lo mesmo assim?
+
+Checking for existing player with your name
+== A verificar a existência de um jogador com o teu nome
+
+Are you sure that you want to disconnect and switch to a different server?
+== Tens a certeza que te queres desconectar e mudar para outro servidor?
+
+Country / Region
+== País / Região
+
+Destination file already exist
+== Ficheiro de destino já existe
+
+Speed
+== Velocidade
+
+Video name:
+== Nome do vídeo:
+
+transmits your player name to info2.ddnet.tw
+== transmite o teu nome de jogador para info2.ddnet.tw
+
+Theme
+== Tema
+
+%d of %d servers
+== %d of %d servidores
+
+%d of %d server
+== %d of %d servidor
+
+%d players
+== %d jogadores
+
+%d player
+== %d jogador
+
+Refreshing...
+== A atualizar...
+
+Date
+== Data
+
+Connect Dummy
+== Conectar Dummy
+
+Time
+== Tempo
+
+Reload
+== Recarregar
+
+Deactivate
+== Desativar
+
+Activate
+== Ativar
+
+Save
+== Guardar
+
+Settings file
+== Ficheiro de definições
+
+Themes directory
+== Diretório de temas
+
+Skins directory
+== Diretório de skins
+
+Dummy
+== Dummy
+
+Windowed
+== Janela
+
+Windowed borderless
+== Janela s/ bordas
+
+Desktop fullscreen
+== Ecrã completo
+
+Game sound volume
+== Volume do jogo
+
+Chat sound volume
+== Volume do chat
+
+Background music volume
+== Volume da música de fundo
+
+Use old chat style
+== Usar o modo antigo de chat
+
+Friend message
+== Mensagem de amigo/a
+
+Size
+== Tamanho
+
+Background
+== Fundo
+
+Particles
+== Partículas
+
+Discord
+== Discord
+
+https://ddnet.tw/discord
+== https://ddnet.tw/discord
+
+Learn
+== Aprender
+
+https://wiki.ddnet.tw/
+== https://wiki.ddnet.tw/
+
+Website
+== Website
+
+Settings
+== Definições
+
+Stop server
+== Parar servidor
+
+Editor
+== Editor
+
+[Start menu]
 
 Successfully saved the replay!
-== 
-
-Saving ddnet-settings.cfg failed
 == 
 
 Replay feature is disabled!
 == 
 
-The width or height of texture %s is not divisible by 16, which might cause visual bugs.
+The width of texture %s is not divisible by %d, or the height is not divisible by %d, which might cause visual bugs.
 == 
 
-Warning
+The format of texture %s is not RGBA which will cause visual bugs.
+== 
+
+Preparing demo playback
+== 
+
+Connected
+== 
+
+Loading map file from storage
+== 
+
+Why are you slowmo replaying to read this?
+== 
+
+Initializing components
+== 
+
+Initializing assets
+== 
+
+Initializing map logic
+== 
+
+Sending initial client info
+== 
+
+Debug mode enabled. Press Ctrl+Shift+D to disable debug mode.
+== 
+
+Position:
+== 
+
+Speed:
+== 
+
+Angle:
 == 
 
 Server best:
@@ -896,7 +1028,25 @@ Server best:
 Personal best:
 == 
 
-Reconnect in %d sec
+Uploading map data to GPU
+== 
+
+Trying to determine UDP connectivity...
+== 
+
+UDP seems to be filtered.
+== 
+
+UDP and TCP IP addresses seem to be different. Try disabling VPN, proxy or network accelerators.
+== 
+
+No answer from server yet.
+== 
+
+Getting game info
+== 
+
+Requesting to join the game
 == 
 
 Render demo
@@ -905,73 +1055,46 @@ Render demo
 Replace video
 == 
 
-File already exists, do you want to overwrite it?
-== 
-
-Disconnect Dummy
-== 
-
-Are you sure that you want to disconnect your dummy?
-== 
-
-Welcome to DDNet
-== 
-
 DDraceNetwork is a cooperative online game where the goal is for you and your group of tees to reach the finish line of the map. As a newcomer you should start on Novice servers, which host the easiest maps. Consider the ping to choose a server close to you.
-== 
-
-The maps contain freeze, which temporarily make a tee unable to move. You have to work together to get through these parts.
-== 
-
-The mouse wheel changes weapons. Hammer (left mouse) can be used to hit other tees and wake them up from being frozen.
-== 
-
-Hook (right mouse) can be used to swing through the map and to hook other tees to you.
-== 
-
-Most importantly communication is key: There is no tutorial so you'll have to chat (t key) with other players to learn the basics and tricks of the game.
 == 
 
 Use k key to kill (restart), q to pause and watch other players. See settings for other key binds.
 == 
 
-It's recommended that you check the settings to adjust them to your liking before joining a server.
+Join Tutorial Server
 == 
 
-Please enter your nick name below.
-== 
-
-Country / Region
-== 
-
-Destination file already exist
-== 
-
-Speed
-== 
-
-Video name:
+Skip Tutorial
 == 
 
 Show DDNet map finishes in server browser
 == 
 
-transmits your player name to info2.ddnet.tw
+Loading menu images
 == 
 
-Theme
+AFR
 == 
 
-%d of %d servers
+ASI
 == 
 
-%d of %d server
+AUS
 == 
 
-%d players
+EUR
 == 
 
-%d player
+NA
+== 
+
+SA
+== 
+
+CHN
+== 
+
+Getting server list from master server
 == 
 
 Filter connecting players
@@ -983,7 +1106,10 @@ Indicate map finish
 Unfinished map
 == 
 
-File
+Leak IP
+== 
+
+Loading demo files
 == 
 
 Markers:
@@ -1001,9 +1127,6 @@ Markers
 Length
 == 
 
-Date
-== 
-
 Fetch Info
 == 
 
@@ -1013,37 +1136,31 @@ Demos directory
 Render
 == 
 
-Connect Dummy
-== 
-
 Kill
 == 
 
 Pause
 == 
 
-Reload
+Loading ghost files
 == 
 
-Deactivate
-== 
-
-Activate
-== 
-
-Save
-== 
-
-Reset wanted weapon on death
+Smooth Dynamic Camera
 == 
 
 Skip the main menu
 == 
 
-Themes directory
+Config directory
+== 
+
+Toggle to edit your dummy settings
 == 
 
 Download skins
+== 
+
+Download community skins
 == 
 
 Vanilla skins only
@@ -1055,10 +1172,13 @@ Fat skins (DDFat)
 Skin prefix
 == 
 
+Choose default eyes when joining a server
+== 
+
 Skin Database
 == 
 
-Skins directory
+Loading skin files
 == 
 
 Hook collisions
@@ -1103,22 +1223,90 @@ Show entities
 Show HUD
 == 
 
-UI mouse s.
+Chat command
+== 
+
+Enable controller
+== 
+
+Controller %d: %s
+== 
+
+Click to cycle through all available controllers.
+== 
+
+[Ingame controller mode]
+Relative
+== 
+
+[Ingame controller mode]
+Absolute
+== 
+
+Ingame controller mode
+== 
+
+Ingame controller sens.
+== 
+
+UI controller sens.
+== 
+
+Controller jitter tolerance
+== 
+
+No controller found. Plug in a controller and restart the game.
+== 
+
+Device
+== 
+
+Status
+== 
+
+Aim bind
+== 
+
+Controller Axis #%d
+== 
+
+Mouse
+== 
+
+Ingame mouse sens.
+== 
+
+UI mouse sens.
+== 
+
+Controller
+== 
+
+Windowed fullscreen
 == 
 
 may cause delay
 == 
 
-Use OpenGL 3.3 (experimental)
-== 
-
-Preinit VBO (iGPUs only)
-== 
-
-Multiple texture units (disable for MacOS)
+Allows maps to render with more detail
 == 
 
 Use high DPI
+== 
+
+Renderer
+== 
+
+default
+== 
+
+custom
+== 
+
+Graphics cards
+== 
+
+auto
 == 
 
 Enable long pain sound (used when shooting in freeze)
@@ -1127,37 +1315,127 @@ Enable long pain sound (used when shooting in freeze)
 Threaded sound loading
 == 
 
-Background music volume
+Appearance
 == 
 
 Assets
 == 
 
-Friend message
+Name Plate
+== 
+
+Hook Collisions
+== 
+
+Kill Messages
+== 
+
+Show health, shields and ammo
+== 
+
+DDRace HUD
+== 
+
+Show client IDs in scoreboard
+== 
+
+Show DDRace HUD
+== 
+
+Show jumps indicator
+== 
+
+Show dummy actions
+== 
+
+Show player position
+== 
+
+Show player speed
+== 
+
+Show player target angle
+== 
+
+Show freeze bars
+== 
+
+Opacity of freeze bars inside freeze
 == 
 
 Client message
 == 
 
-Outline color
+Preview
 == 
 
-Wait before try for
+Show hook strength indicator
 == 
 
-Default length: %d
+Show other players' key presses
+== 
+
+Show local player's key presses
+== 
+
+Hook collision line
+== 
+
+Show other players' hook collision lines
+== 
+
+Hook collision line width
+== 
+
+Hook collision line opacity
+== 
+
+Colors of the hook collision line, in case of a possible collision with:
+== 
+
+Your movements are not taken into account when calculating the line colors
+== 
+
+Nothing hookable
+== 
+
+Something hookable
+== 
+
+A Tee
+== 
+
+Normal Color
+== 
+
+Highlight Color
+== 
+
+Laser Outline Color
+== 
+
+Laser Inner Color
 == 
 
 Enable replays
 == 
 
+Default length: %d
+== 
+
+When you cross the start line, show a ghost tee replicating the movements of your best time
+== 
+
 Overlay entities
 == 
 
-Size
+Show text entities
 == 
 
-Show text entities
+Opacity
+== 
+
+Adjust the opacity of entities belonging to other teams, such as tees and nameplates
 == 
 
 Show others (own team only)
@@ -1166,10 +1444,13 @@ Show others (own team only)
 Show quads
 == 
 
-Show other players' hook collision lines
+Quads are used for background decoration
 == 
 
-Show other players' key presses
+Tries to predict other entities to give a feel of low latency
+== 
+
+Entities Background color
 == 
 
 Use current map as background
@@ -1178,7 +1459,16 @@ Use current map as background
 Show tiles layers from BG map
 == 
 
+Regular Background Color
+== 
+
 Try fast HTTP map download first
+== 
+
+Run on join
+== 
+
+Chat command (e.g. showall 1)
 == 
 
 Entities
@@ -1187,34 +1477,25 @@ Entities
 Emoticons
 == 
 
-Particles
+Extras
+== 
+
+Loading assets
 == 
 
 Assets directory
 == 
 
-Learn
+Tutorial
 == 
 
-https://wiki.ddnet.tw/
-== 
-
-Website
-== 
-
-Settings
-== 
-
-Stop server
+Can't find a Tutorial server
 == 
 
 Run server
 == 
 
 Server executable not found, can't run server
-== 
-
-Editor
 == 
 
 [Start menu]
@@ -1230,19 +1511,28 @@ Downloading %s:
 Update failed! Check log...
 == 
 
-Time
+Loading race demo files
 == 
 
-Manual %3d:%02d  
+Super
 == 
 
-Race %3d:%02d  
+Team %d
 == 
 
-Auto %3d:%02d  
+Manual
 == 
 
-Replay %3d:%02d  
+Race
+== 
+
+Auto
+== 
+
+Replay
+== 
+
+Loading sound files
 == 
 
 Frags

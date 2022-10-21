@@ -3,7 +3,7 @@
 #ifndef GAME_MAPITEMS_H
 #define GAME_MAPITEMS_H
 
-#include <engine/shared/protocol.h>
+#include <base/vmath.h>
 
 // layer types
 enum
@@ -80,6 +80,11 @@ enum
 	//DDRace - Shotgun
 	ENTITY_CRAZY_SHOTGUN_EX,
 	ENTITY_CRAZY_SHOTGUN,
+	//DDNet - Removing specific weapon
+	ENTITY_ARMOR_SHOTGUN,
+	ENTITY_ARMOR_GRENADE,
+	ENTITY_ARMOR_NINJA,
+	ENTITY_ARMOR_LASER,
 	//DDRace - Draggers
 	ENTITY_DRAGGER_WEAK = 42,
 	ENTITY_DRAGGER_NORMAL,
@@ -130,8 +135,8 @@ enum
 	TILE_REFILL_JUMPS = 32,
 	TILE_START,
 	TILE_FINISH,
-	TILE_CHECKPOINT_FIRST = 35,
-	TILE_CHECKPOINT_LAST = 59,
+	TILE_TIME_CHECKPOINT_FIRST = 35,
+	TILE_TIME_CHECKPOINT_LAST = 59,
 	TILE_STOP = 60,
 	TILE_STOPS,
 	TILE_STOPA,
@@ -152,7 +157,7 @@ enum
 	TILE_UNLIMITED_JUMPS_DISABLE,
 	TILE_JETPACK_DISABLE,
 	TILE_NPH_DISABLE,
-	TILE_SUBSTRACT_TIME = 95,
+	TILE_SUBTRACT_TIME = 95,
 	TILE_TELE_GUN_ENABLE = 96,
 	TILE_TELE_GUN_DISABLE = 97,
 	TILE_ALLOW_TELE_GUN = 98,
@@ -169,6 +174,8 @@ enum
 	TILE_CREDITS_2 = 141,
 	TILE_CREDITS_3 = 142,
 	TILE_CREDITS_4 = 143,
+	TILE_LFREEZE = 144,
+	TILE_LUNFREEZE = 145,
 	TILE_CREDITS_5 = 156,
 	TILE_CREDITS_6 = 157,
 	TILE_CREDITS_7 = 158,
@@ -213,15 +220,8 @@ enum
 	TILE_SPIKE_PURPLE = 15
 };
 
-struct CPoint
-{
-	int x, y; // 22.10 fixed point
-};
-
-struct CColor
-{
-	int r, g, b, a;
-};
+typedef ivec2 CPoint; // 22.10 fixed point
+typedef ivec4 CColor;
 
 struct CQuad
 {

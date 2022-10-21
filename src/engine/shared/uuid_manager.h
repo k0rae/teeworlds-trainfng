@@ -1,8 +1,9 @@
 #ifndef ENGINE_SHARED_UUID_MANAGER_H
 #define ENGINE_SHARED_UUID_MANAGER_H
 
-#include <base/tl/array.h>
-#include <base/tl/sorted_array.h>
+#include <vector>
+
+#include <base/system.h>
 
 enum
 {
@@ -27,7 +28,8 @@ CUuid RandomUuid();
 CUuid CalculateUuid(const char *pName);
 // The buffer length should be at least UUID_MAXSTRSIZE.
 void FormatUuid(CUuid Uuid, char *pBuffer, unsigned BufferLength);
-void ParseUuid(CUuid *pUuid, char *pBuffer);
+// Returns nonzero on failure.
+int ParseUuid(CUuid *pUuid, const char *pBuffer);
 
 struct CName
 {
@@ -41,8 +43,7 @@ struct CNameIndexed
 	int m_ID;
 
 	bool operator<(const CNameIndexed &Other) const { return m_Uuid < Other.m_Uuid; }
-	bool operator<(const CUuid &Other) const { return m_Uuid < Other; }
-	bool operator==(const CUuid &Other) const { return m_Uuid == Other; }
+	bool operator==(const CNameIndexed &Other) const { return m_Uuid == Other.m_Uuid; }
 };
 
 class CPacker;
@@ -50,8 +51,8 @@ class CUnpacker;
 
 class CUuidManager
 {
-	array<CName> m_aNames;
-	sorted_array<CNameIndexed> m_aNamesSorted;
+	std::vector<CName> m_vNames;
+	std::vector<CNameIndexed> m_vNamesSorted;
 
 public:
 	void RegisterName(int ID, const char *pName);

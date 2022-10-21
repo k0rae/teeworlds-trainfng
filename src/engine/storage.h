@@ -7,8 +7,7 @@
 
 enum
 {
-	MAX_PATHS = 16,
-	MAX_PATH_LENGTH = 512
+	MAX_PATHS = 16
 };
 
 class IStorage : public IInterface
@@ -27,8 +26,10 @@ public:
 	};
 
 	virtual void ListDirectory(int Type, const char *pPath, FS_LISTDIR_CALLBACK pfnCallback, void *pUser) = 0;
-	virtual void ListDirectoryInfo(int Type, const char *pPath, FS_LISTDIR_INFO_CALLBACK pfnCallback, void *pUser) = 0;
-	virtual IOHANDLE OpenFile(const char *pFilename, int Flags, int Type, char *pBuffer = 0, int BufferSize = 0) = 0;
+	virtual void ListDirectoryInfo(int Type, const char *pPath, FS_LISTDIR_CALLBACK_FILEINFO pfnCallback, void *pUser) = 0;
+	virtual IOHANDLE OpenFile(const char *pFilename, int Flags, int Type, char *pBuffer = nullptr, int BufferSize = 0) = 0;
+	virtual bool ReadFile(const char *pFilename, int Type, void **ppResult, unsigned *pResultLen) = 0;
+	virtual char *ReadFileStr(const char *pFilename, int Type) = 0;
 	virtual bool FindFile(const char *pFilename, const char *pPath, int Type, char *pBuffer, int BufferSize) = 0;
 	virtual bool RemoveFile(const char *pFilename, int Type) = 0;
 	virtual bool RenameFile(const char *pOldFilename, const char *pNewFilename, int Type) = 0;
@@ -40,9 +41,11 @@ public:
 	virtual const char *GetBinaryPath(const char *pFilename, char *pBuffer, unsigned BufferSize) = 0;
 
 	static void StripPathAndExtension(const char *pFilename, char *pBuffer, int BufferSize);
+	static const char *FormatTmpPath(char *aBuf, unsigned BufSize, const char *pPath);
 };
 
-extern IStorage *CreateStorage(const char *pApplicationName, int StorageType, int NumArgs, const char **ppArguments);
+extern IStorage *CreateStorage(int StorageType, int NumArgs, const char **ppArguments);
 extern IStorage *CreateLocalStorage();
+extern IStorage *CreateTempStorage(const char *pDirectory);
 
 #endif

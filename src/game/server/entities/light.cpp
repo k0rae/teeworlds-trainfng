@@ -1,10 +1,15 @@
 /* (c) Shereef Marzouk. See "licence DDRace.txt" and the readme.txt in the root of the distribution for more information. */
 #include "light.h"
-#include <engine/config.h>
+#include "character.h"
+
 #include <engine/server.h>
+
 #include <game/generated/protocol.h>
 #include <game/mapitems.h>
+#include <game/teamscore.h>
+
 #include <game/server/gamecontext.h>
+#include <game/server/player.h>
 
 CLight::CLight(CGameWorld *pGameWorld, vec2 Pos, float Rotation, int Length,
 	int Layer, int Number) :
@@ -27,13 +32,11 @@ bool CLight::HitCharacter()
 		GameServer()->m_World.IntersectedCharacters(m_Pos, m_To, 0.0f, 0);
 	if(HitCharacters.empty())
 		return false;
-	for(std::list<CCharacter *>::iterator i = HitCharacters.begin();
-		i != HitCharacters.end(); i++)
+	for(auto *pChar : HitCharacters)
 	{
-		CCharacter *Char = *i;
-		if(m_Layer == LAYER_SWITCH && !GameServer()->Collision()->m_pSwitchers[m_Number].m_Status[Char->Team()])
+		if(m_Layer == LAYER_SWITCH && m_Number > 0 && !Switchers()[m_Number].m_aStatus[pChar->Team()])
 			continue;
-		Char->Freeze();
+		pChar->Freeze();
 	}
 	return true;
 }
@@ -75,7 +78,7 @@ void CLight::Step()
 
 void CLight::Reset()
 {
-	GameServer()->m_World.DestroyEntity(this);
+	m_MarkedForDestroy = true;
 }
 
 void CLight::Tick()
@@ -95,7 +98,6 @@ void CLight::Tick()
 	}
 
 	HitCharacter();
-	return;
 }
 
 void CLight::Snap(int SnappingClient)
@@ -103,18 +105,32 @@ void CLight::Snap(int SnappingClient)
 	if(NetworkClipped(SnappingClient, m_Pos) && NetworkClipped(SnappingClient, m_To))
 		return;
 
-	CCharacter *Char = GameServer()->GetPlayerChar(SnappingClient);
+	int SnappingClientVersion = GameServer()->GetClientVersion(SnappingClient);
 
-	if(SnappingClient > -1 && (GameServer()->m_apPlayers[SnappingClient]->GetTeam() == -1 || GameServer()->m_apPlayers[SnappingClient]->IsPaused()) && GameServer()->m_apPlayers[SnappingClient]->m_SpectatorID != SPEC_FREEVIEW)
-		Char = GameServer()->GetPlayerChar(GameServer()->m_apPlayers[SnappingClient]->m_SpectatorID);
+	CNetObj_EntityEx *pEntData = 0;
+	if(SnappingClientVersion >= VERSION_DDNET_SWITCH && (m_Layer == LAYER_SWITCH || length(m_Core) > 0))
+		pEntData = static_cast<CNetObj_EntityEx *>(Server()->SnapNewItem(NETOBJTYPE_ENTITYEX, GetID(), sizeof(CNetObj_EntityEx)));
 
-	int Tick = (Server()->Tick() % Server()->TickSpeed()) % 6;
+	CCharacter *pChr = GameServer()->GetPlayerChar(SnappingClient);
 
-	if(Char && Char->IsAlive() && m_Layer == LAYER_SWITCH && !GameServer()->Collision()->m_pSwitchers[m_Number].m_Status[Char->Team()] && (Tick))
-		return;
+	if(SnappingClient != SERVER_DEMO_CLIENT && (GameServer()->m_apPlayers[SnappingClient]->GetTeam() == TEAM_SPECTATORS || GameServer()->m_apPlayers[SnappingClient]->IsPaused()) && GameServer()->m_apPlayers[SnappingClient]->m_SpectatorID != SPEC_FREEVIEW)
+		pChr = GameServer()->GetPlayerChar(GameServer()->m_apPlayers[SnappingClient]->m_SpectatorID);
+
+	if(pEntData)
+	{
+		pEntData->m_SwitchNumber = m_Number;
+		pEntData->m_Layer = m_Layer;
+		pEntData->m_EntityClass = ENTITYCLASS_LIGHT;
+	}
+	else
+	{
+		int Tick = (Server()->Tick() % Server()->TickSpeed()) % 6;
+		if(pChr && pChr->IsAlive() && m_Layer == LAYER_SWITCH && m_Number > 0 && !Switchers()[m_Number].m_aStatus[pChr->Team()] && Tick)
+			return;
+	}
 
 	CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(Server()->SnapNewItem(
-		NETOBJTYPE_LASER, m_ID, sizeof(CNetObj_Laser)));
+		NETOBJTYPE_LASER, GetID(), sizeof(CNetObj_Laser)));
 
 	if(!pObj)
 		return;
@@ -122,12 +138,12 @@ void CLight::Snap(int SnappingClient)
 	pObj->m_X = (int)m_Pos.x;
 	pObj->m_Y = (int)m_Pos.y;
 
-	if(Char && Char->Team() == TEAM_SUPER)
+	if(pChr && pChr->Team() == TEAM_SUPER)
 	{
 		pObj->m_FromX = (int)m_Pos.x;
 		pObj->m_FromY = (int)m_Pos.y;
 	}
-	else if(Char && m_Layer == LAYER_SWITCH && GameServer()->Collision()->m_pSwitchers[m_Number].m_Status[Char->Team()])
+	else if(pChr && m_Layer == LAYER_SWITCH && Switchers()[m_Number].m_aStatus[pChr->Team()])
 	{
 		pObj->m_FromX = (int)m_To.x;
 		pObj->m_FromY = (int)m_To.y;
@@ -143,10 +159,17 @@ void CLight::Snap(int SnappingClient)
 		pObj->m_FromY = (int)m_Pos.y;
 	}
 
-	int StartTick = m_EvalTick;
-	if(StartTick < Server()->Tick() - 4)
-		StartTick = Server()->Tick() - 4;
-	else if(StartTick > Server()->Tick())
-		StartTick = Server()->Tick();
-	pObj->m_StartTick = StartTick;
+	if(pEntData)
+	{
+		pObj->m_StartTick = 0;
+	}
+	else
+	{
+		int StartTick = m_EvalTick;
+		if(StartTick < Server()->Tick() - 4)
+			StartTick = Server()->Tick() - 4;
+		else if(StartTick > Server()->Tick())
+			StartTick = Server()->Tick();
+		pObj->m_StartTick = StartTick;
+	}
 }

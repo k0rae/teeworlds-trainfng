@@ -5,7 +5,8 @@
 #	Martin Pola		2011-04-02 11:17:09
 #	Kottizen		2011-07-02 00:34:54
 #	3edcxzaq1		2020-06-25 00:00:00
-#	cur.ie		2020-09-28 00:00:00
+#	cur.ie			2020-09-28 00:00:00
+#	simpygirl		2022-02-20 00:00:00
 ##### /authors #####
 
 ##### translated strings #####
@@ -88,9 +89,6 @@ Client
 Close
 == Stäng
 
-Compatible version
-== Kompatibel version
-
 Connect
 == Anslut
 
@@ -147,9 +145,6 @@ Dynamic Camera
 
 Emoticon
 == Känsloikon
-
-Enter
-== Fortsätt
 
 Error
 == Fel
@@ -221,7 +216,7 @@ High Detail
 == Extra detaljer
 
 Hook
-== Haken
+== Hook
 
 Invalid Demo
 == Ogiltigt deo
@@ -246,12 +241,6 @@ MOTD
 
 Map
 == Bana
-
-Maximum ping:
-== Högsta ping:
-
-Mouse sens.
-== Muskänslighet
 
 Move left
 == Gå vänster
@@ -350,9 +339,6 @@ Red team wins!
 Refresh
 == Uppdatera
 
-Refreshing master servers
-== Uppdaterar huvudservrar
-
 Remote console
 == Serverkonsol
 
@@ -415,9 +401,6 @@ Show ingame HUD
 
 Show name plates
 == Visa namnskyltar
-
-Show only supported
-== Visa endast upplösningar som stöds
 
 Skins
 == Utseende
@@ -527,8 +510,6 @@ Yes
 You must restart the game for all settings to take effect.
 == Du måste starta om spelet för att ändringarna skall verkställas.
 
-##### needs translation #####
-
 New name:
 == Nytt namn:
 
@@ -625,17 +606,11 @@ Name plates size
 Type:
 == Typ:
 
-Show console window
-== Visa konsol fönster
-
 Vanilla skins only
 == Bara vanilla skins
 
 New random timeout code
 == Ny slumpad timeout kod
-
-UI mouse s.
-== UI mus s.
 
 Select a name
 == Välj ett namn
@@ -643,14 +618,11 @@ Select a name
 Enable long pain sound (used when shooting in freeze)
 == Aktivera ett långt ont ljud (använt vid sjutning i freeze)
 
-We will win
-== Vi kommer att vinna
-
 Default zoom
 == Standard zoom
 
 Dummy copy
-== Dummy kopiering 
+== Dummy kopiering
 
 Show tiles layers from BG map
 == Visa tiles lager från BG bana
@@ -692,7 +664,7 @@ Indicate map finish
 == Indikera bana avklarning
 
 Map sound volume
-== Bana ljud Volym
+== Bana ljudvolym
 
 Reconnect in %d sec
 == Återkopplar om %d sekunder
@@ -708,9 +680,6 @@ Browser
 
 Default length: %d
 == Standard längd: %d
-
-Hello and welcome
-== Hej och välkommen
 
 Switch weapon when out of ammo
 == Byt vapen vid slut av ammunition
@@ -752,24 +721,12 @@ transmits your player name to info2.ddnet.tw
 == 9+ nya nämningar
 
 DDraceNetwork is a cooperative online game where the goal is for you and your group of tees to reach the finish line of the map. As a newcomer you should start on Novice servers, which host the easiest maps. Consider the ping to choose a server close to you.
-== DDraceNetwork är ett kooperativ online spel där målet är för dig och en group av tees att nå banas mål. Som en nykomling så borde du starta på Novice serverna, vilket har bara de enklast banorna. Kom ihåg att använda ping till att välja en server som är nära dig.
-
-The maps contain freeze, which temporarily make a tee unable to move. You have to work together to get through these parts.
-== Banorna innehåller freeze, vilket temporärt gör att en tee inte kan röra sig. Du behöver att arbeta tillsamas för att komma igenom dessa delar.
-
-The mouse wheel changes weapons. Hammer (left mouse) can be used to hit other tees and wake them up from being frozen.
-== Med Skrollhjulet så kan du ändra vapen. Hammaren (vänster klick) kan användas till att slå andra tees och vakna up de från att bli frysta.
-
-Hook (right mouse) can be used to swing through the map and to hook other tees to you.
-== Hook (höger klick) kan användas till att svinga sig igenom banan och att dra andra tees till dig.
-
-Most importantly communication is key: There is no tutorial so you'll have to chat (t key) with other players to learn the basics and tricks of the game.
-== Mest viktiga är kommunikation: Det finns ingen tutorial så du kommer att behöva chatta (t knappen) med andra spelare för att lära dig grunderna och tricks till spelet.
+== DDraceNetwork är ett kooperativ online spel där målet är för dig och en grupp av tees att nå banas mål. Som en nykomling, så borde du starta på Novice serverna, vilket har bara de enklaste banorna. Kom ihåg att använda ping till att välja en server som är nära dig.
 
 It's recommended that you check the settings to adjust them to your liking before joining a server.
-== Det är rekomenderad att du kollar igenom inställningarna och ändra dom så de passar dig innan du ansluter dig till en server.
+== Det är rekommenderad att du kollar igenom inställningarna och ändra dem, så de passar dig innan du ansluter till en server.
 
-Please enter your nick name below.
+Please enter your nickname below.
 == Skriv ditt smeknamn nedanför.
 
 Render
@@ -820,9 +777,6 @@ Time
 Filter connecting players
 == Filtrera spelare som ansluter
 
-Friend
-== Vän
-
 Enable game sounds
 == Aktivera spel ljud
 
@@ -831,9 +785,6 @@ Max CSVs
 
 Zoom in
 == Zooma in
-
-Hi o/
-== Hej o/
 
 Update failed! Check log...
 == Updatering misslyckades! Kolla logg...
@@ -844,17 +795,8 @@ Update failed! Check log...
 Check now
 == Kolla nu
 
-second
-== sekund
-
-Reset wanted weapon on death
-== Återställ önskade vapen vid död
-
 Search
 == Sök
-
-Borderless window
-== Gränslös fönster
 
 FPM
 == FPM
@@ -883,14 +825,8 @@ Show text entities
 Show ghost
 == Visa spöke
 
-Replay %3d:%02d  
-== Repris %3d:%02d
-
 1 new mention
 == 1 ny nämning
-
-Wait before try for
-== Vänta innan försök för
 
 Are you sure that you want to disconnect your dummy?
 == Är du säker att du vill koppla ifrån din dummy?
@@ -916,9 +852,6 @@ Normal message
 Show score
 == Visa poäng
 
-Multiple texture units (disable for MacOS)
-== Multiple texture units (avaktivera för MacOS)
-
 Refresh Rate
 == Uppdateringsfrekvens
 
@@ -937,12 +870,6 @@ Follow
 Restart
 == Starta om
 
-Manual %3d:%02d  
-== Manual %3d:%02d
-
-Background (regular)
-== Bakgrund (vanlig)
-
 Hammerfly dummy
 == Hammerfly dummy
 
@@ -955,17 +882,11 @@ Enable team chat sound
 Disconnect Dummy
 == Koppla ifrån dummy
 
-Background (entities)
-== Bakgrund (entities)
-
 Replace video
 == Ersätt video
 
-Look out!
-== Se upp!
-
 Server best:
-== Serverens bästa:
+== Serverns bästa:
 
 Friend message
 == Vän meddelande
@@ -978,12 +899,6 @@ Fat skins (DDFat)
 
 Net
 == Nät
-
-seconds
-== sekunder
-
-Spectator
-== Åskådare
 
 Demo
 == Demo
@@ -1036,14 +951,8 @@ Best
 Updating...
 == Updaterar...
 
-Preinit VBO (iGPUs only)
-== Preinit VBO (bara iGPUs)
-
 Clan plates size
 == Klanskylt storlek
-
-Outline color
-== Kontur färg
 
 Size
 == Storlek
@@ -1078,9 +987,6 @@ Please use a different name
 Destination file already exist
 == Destinations fil finns redan
 
-Show client IDs in Scoreboard
-== Visa klient IDen i poänglista
-
 Game paused
 == Spel pausad
 
@@ -1093,9 +999,6 @@ Automatically create statboard csv
 Old mouse mode
 == Gammal mus metod
 
-Inner color
-== Innre färg
-
 Enable regular chat sound
 == Aktivera vanligt chatt ljud
 
@@ -1107,9 +1010,6 @@ Gameplay
 
 Loading DDNet Client
 == Laddar DDNet Klienten
-
-Auto %3d:%02d  
-== Auto %3d:%02d
 
 Show HUD
 == Visa HUD
@@ -1126,23 +1026,14 @@ Spree
 Show others
 == Visa andra
 
-Race %3d:%02d  
-== Race %3d:%02d
-
 Unfinished map
-== Oavslutat bana
-
-Show health + ammo
-== Visa hälsa + ammunition
+== Oavklarad bana
 
 Show quads
 == Visa quads
 
 Show names in chat in team colors
-== Visa namn in chatten med lag färger
-
-Use OpenGL 3.3 (experimental)
-== Använd OpenGL 3.3 (experimentell)
+== Visa namn in chatten med lagets färger
 
 Update now
 == Updatera nu
@@ -1168,14 +1059,11 @@ Connect Dummy
 Show others (own team only)
 == Visa andra (eget lag endast)
 
-The width or height of texture %s is not divisible by 16, which might cause visual bugs.
-== Bredden eller höjden av texturen %s är ej delbar med 16, och kan därav skapa visuella buggar.
-
 Warning
 == Varning
 
 Use k key to kill (restart), q to pause and watch other players. See settings for other key binds.
-== Använd knappen k för att dö (starta om), q för att pausa och se andra spelare. Se inställnignar för andra knappbindningar.
+== Använd knappen k för att dö (starta om), q för att pausa och se andra spelare. Se inställningar för andra knappbindningar.
 
 Country / Region
 == Land / Region
@@ -1184,7 +1072,7 @@ Speed
 == Hastighet
 
 %d of %d servers
-== %d av %d servrar.
+== %d av %d servrar
 
 %d of %d server
 == %d av %d server
@@ -1229,47 +1117,445 @@ Editor
 Play
 == Spela
 
-Downloading ddnet-info.json failed
-== 
+Manual
+== Manual
+
+Race
+== Race
+
+Auto
+== Auto
+
+Replay
+== Repris
 
 Saving ddnet-settings.cfg failed
-== 
+== Det gick inte att spara ddnet-settings.cfg
+
+The width of texture %s is not divisible by %d, or the height is not divisible by %d, which might cause visual bugs.
+== Bredden på texturen %s är inte delbar med %d, eller höjden är inte delbar med %d, vilket kan orsaka visuella buggar.
+
+Debug mode enabled. Press Ctrl+Shift+D to disable debug mode.
+== Felsökningsläge är aktiverad, Klicka Ctrl+Shift+D för att stänga av felsökningsläge.
+
+Existing Player
+== Existerande spelare
+
+Your nickname '%s' is already used (%d points). Do you still want to use it?
+== Ditt smeknamn '%s' är redan i användning (%d poäng). Vill du använda namnet ändå?
+
+Checking for existing player with your name
+== Söker efter en befintlig spelare med ditt namn
+
+Are you sure that you want to disconnect and switch to a different server?
+== Är du säker att du vill koppla ifrån och byta server?
 
 Theme
-== 
+== Tema
 
-File
-== 
+AFR
+== AFR
+
+ASI
+== ASI
+
+AUS
+== AUS
+
+EUR
+== EUR
+
+NA
+== NA
+
+SA
+== SA
+
+CHN
+== CHN
+
+Getting server list from master server
+== Hämtar server lista från master server
+
+Refreshing...
+== Ladder om...
+
+Leak IP
+== Läck IP
 
 Demos directory
-== 
+== Demos mapp
+
+Smooth Dynamic Camera
+== Smooth dynamisk kamera
+
+Settings file
+== Inställningsfil
+
+Config directory
+== Config mapp
 
 Themes directory
-== 
+== Tema mapp
 
 Skin Database
-== 
+== Skin databas
 
 Skins directory
-== 
+== Skins mapp
+
+Chat command
+== Chattkommando
+
+Dummy
+== Dummy
+
+Windowed
+== Windowed
+
+Windowed borderless
+== Windowed borderless
+
+Windowed fullscreen
+== Windowed fullscreen
+
+Desktop fullscreen
+== Desktop fullscreen
+
+Game sound volume
+== Spel ljudvolym
+
+Chat sound volume
+== Chat ljudvolym
 
 Background music volume
-== 
+== Bakgrund musik volym
 
 Assets
-== 
+== Assets
+
+Kill Messages
+== Döds meddelanden
+
+Laser Outline Color
+== Laser Yttre Färg
+
+Laser Inner Color
+== Laser Inre Färg
+
+Use old chat style
+== Använd gammal chatt stil
+
+Preview
+== Förhandsvisning
+
+Show local player's key presses
+== Visa egna tangent tryck
+
+Background
+== Bakgrund
+
+Entities Background color
+== Entities bakgrunds färg
 
 Use current map as background
-== 
+== Använd nuvarande bana som bakgrund
+
+Regular Background Color
+== Vanlig Bakgrunds Färg
+
+Run on join
+== Kör på join
+
+Chat command (e.g. showall 1)
+== Chatt kommando (t.ex. showall 1)
 
 Entities
-== 
+== Entities
 
 Emoticons
-== 
+== Emoticons
 
 Particles
-== 
+== Partiklar
 
 Assets directory
+== Assets mapp
+
+Discord
+== Discord
+
+https://ddnet.tw/discord
+== https://ddnet.tw/discord
+
+The format of texture %s is not RGBA which will cause visual bugs.
+== 
+
+Preparing demo playback
+== 
+
+Connected
+== 
+
+Loading map file from storage
+== 
+
+Why are you slowmo replaying to read this?
+== 
+
+Initializing components
+== 
+
+Initializing assets
+== 
+
+Initializing map logic
+== 
+
+Sending initial client info
+== 
+
+Position:
+== 
+
+Speed:
+== 
+
+Angle:
+== 
+
+Uploading map data to GPU
+== 
+
+Trying to determine UDP connectivity...
+== 
+
+UDP seems to be filtered.
+== 
+
+UDP and TCP IP addresses seem to be different. Try disabling VPN, proxy or network accelerators.
+== 
+
+No answer from server yet.
+== 
+
+Getting game info
+== 
+
+Requesting to join the game
+== 
+
+Join Tutorial Server
+== 
+
+Skip Tutorial
+== 
+
+Loading menu images
+== 
+
+Loading demo files
+== 
+
+Loading ghost files
+== 
+
+Toggle to edit your dummy settings
+== 
+
+Download community skins
+== 
+
+Choose default eyes when joining a server
+== 
+
+Loading skin files
+== 
+
+Enable controller
+== 
+
+Controller %d: %s
+== 
+
+Click to cycle through all available controllers.
+== 
+
+[Ingame controller mode]
+Relative
+== 
+
+[Ingame controller mode]
+Absolute
+== 
+
+Ingame controller mode
+== 
+
+Ingame controller sens.
+== 
+
+UI controller sens.
+== 
+
+Controller jitter tolerance
+== 
+
+No controller found. Plug in a controller and restart the game.
+== 
+
+Device
+== 
+
+Status
+== 
+
+Aim bind
+== 
+
+Controller Axis #%d
+== 
+
+Mouse
+== 
+
+Ingame mouse sens.
+== 
+
+UI mouse sens.
+== 
+
+Controller
+== 
+
+Allows maps to render with more detail
+== 
+
+Renderer
+== 
+
+default
+== 
+
+custom
+== 
+
+Graphics cards
+== 
+
+auto
+== 
+
+Appearance
+== 
+
+Name Plate
+== 
+
+Hook Collisions
+== 
+
+Show health, shields and ammo
+== 
+
+DDRace HUD
+== 
+
+Show client IDs in scoreboard
+== 
+
+Show DDRace HUD
+== 
+
+Show jumps indicator
+== 
+
+Show dummy actions
+== 
+
+Show player position
+== 
+
+Show player speed
+== 
+
+Show player target angle
+== 
+
+Show freeze bars
+== 
+
+Opacity of freeze bars inside freeze
+== 
+
+Show hook strength indicator
+== 
+
+Hook collision line
+== 
+
+Hook collision line width
+== 
+
+Hook collision line opacity
+== 
+
+Colors of the hook collision line, in case of a possible collision with:
+== 
+
+Your movements are not taken into account when calculating the line colors
+== 
+
+Nothing hookable
+== 
+
+Something hookable
+== 
+
+A Tee
+== 
+
+Normal Color
+== 
+
+Highlight Color
+== 
+
+When you cross the start line, show a ghost tee replicating the movements of your best time
+== 
+
+Opacity
+== 
+
+Adjust the opacity of entities belonging to other teams, such as tees and nameplates
+== 
+
+Quads are used for background decoration
+== 
+
+Tries to predict other entities to give a feel of low latency
+== 
+
+Extras
+== 
+
+Loading assets
+== 
+
+Tutorial
+== 
+
+Can't find a Tutorial server
+== 
+
+Loading race demo files
+== 
+
+Super
+== 
+
+Team %d
+== 
+
+Loading sound files
 == 

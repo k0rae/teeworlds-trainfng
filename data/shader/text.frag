@@ -1,8 +1,8 @@
-uniform sampler2D textSampler;
-uniform sampler2D textOutlineSampler;
+uniform sampler2D gTextSampler;
+uniform sampler2D gTextOutlineSampler;
 
-uniform vec4 vertColor;
-uniform vec4 vertOutlineColor;
+uniform vec4 gVertColor;
+uniform vec4 gVertOutlineColor;
 
 noperspective in vec2 texCoord;
 noperspective in vec4 outVertColor;
@@ -10,12 +10,12 @@ noperspective in vec4 outVertColor;
 out vec4 FragClr;
 void main()
 {
-	vec4 textColor = vertColor * outVertColor * texture(textSampler, texCoord);
-	vec4 textOutlineTex = vertOutlineColor * texture(textOutlineSampler, texCoord);
-	
+	vec4 textColor = gVertColor * outVertColor * vec4(1.0, 1.0, 1.0, texture(gTextSampler, texCoord).r);
+	vec4 textOutlineTex = gVertOutlineColor * vec4(1.0, 1.0, 1.0, texture(gTextOutlineSampler, texCoord).r);
+
 	// ratio between the two textures
 	float OutlineBlend = (1.0 - textColor.a);	
-	
+
 	// since the outline is always black, or even if it has decent colors, it can be just added to the actual color
 	// without loosing any or too much color
 	
@@ -29,10 +29,9 @@ void main()
 	
 	float RealAlpha = (textOutlineFrag.a + textColor.a);
 	
-	// discard transparent fragments
-	if(RealAlpha == 0.0)
-		discard;
-	
 	// simply add the color we will loose through blending
-	FragClr = vec4(finalFragColor / RealAlpha, RealAlpha);
+	if(RealAlpha > 0.0)
+		FragClr = vec4(finalFragColor / RealAlpha, RealAlpha);
+	else
+		FragClr = vec4(0.0, 0.0, 0.0, 0.0);
 }

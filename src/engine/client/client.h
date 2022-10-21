@@ -8,25 +8,34 @@
 
 #include <base/hash.h>
 #include <engine/client.h>
-#include <engine/client/demoedit.h>
+#include <engine/client/checksum.h>
 #include <engine/client/friends.h>
 #include <engine/client/ghost.h>
-#include <engine/client/http.h>
 #include <engine/client/serverbrowser.h>
 #include <engine/client/updater.h>
 #include <engine/editor.h>
 #include <engine/engine.h>
 #include <engine/graphics.h>
-#include <engine/input.h>
-#include <engine/map.h>
-#include <engine/masterserver.h>
 #include <engine/shared/config.h>
 #include <engine/shared/demo.h>
 #include <engine/shared/fifo.h>
+#include <engine/shared/http.h>
 #include <engine/shared/network.h>
-#include <engine/sound.h>
-#include <engine/steam.h>
 #include <engine/warning.h>
+
+class CDemoEdit;
+class IDemoRecorder;
+class CMsgPacker;
+class CUnpacker;
+class IConfigManager;
+class IDiscord;
+class IEngineInput;
+class IEngineMap;
+class IEngineSound;
+class IFriends;
+class ISteam;
+class IStorage;
+class IUpdater;
 
 #define CONNECTLINK "ddnet:"
 
@@ -35,29 +44,36 @@ class CGraph
 public:
 	enum
 	{
-		// restrictions: Must be power of two
 		MAX_VALUES = 128,
 	};
 
+private:
 	float m_Min, m_Max;
+	float m_MinRange, m_MaxRange;
 	float m_aValues[MAX_VALUES];
 	float m_aColors[MAX_VALUES][3];
-	int m_Index;
+	size_t m_Index;
 
+public:
 	void Init(float Min, float Max);
+	void SetMin(float Min);
+	void SetMax(float Max);
 
-	void ScaleMax();
-	void ScaleMin();
-
+	void Scale();
 	void Add(float v, float r, float g, float b);
+	void InsertAt(size_t Index, float v, float r, float g, float b);
 	void Render(IGraphics *pGraphics, IGraphics::CTextureHandle FontTexture, float x, float y, float w, float h, const char *pDescription);
 };
 
 class CSmoothTime
 {
-	int64 m_Snap;
-	int64 m_Current;
-	int64 m_Target;
+	int64_t m_Snap;
+	int64_t m_Current;
+	int64_t m_Target;
+
+	int64_t m_SnapMargin;
+	int64_t m_CurrentMargin;
+	int64_t m_TargetMargin;
 
 	CGraph m_Graph;
 
@@ -65,19 +81,26 @@ class CSmoothTime
 
 	float m_aAdjustSpeed[2]; // 0 = down, 1 = up
 public:
-	void Init(int64 Target);
+	void Init(int64_t Target);
 	void SetAdjustSpeed(int Direction, float Value);
 
-	int64 Get(int64 Now);
+	int64_t Get(int64_t Now);
 
-	void UpdateInt(int64 Target);
-	void Update(CGraph *pGraph, int64 Target, int TimeLeft, int AdjustDirection);
+	void UpdateInt(int64_t Target);
+	void Update(CGraph *pGraph, int64_t Target, int TimeLeft, int AdjustDirection);
+
+	int64_t GetMargin(int64_t Now);
+	void UpdateMargin(int64_t TargetMargin);
 };
 
 class CServerCapabilities
 {
 public:
 	bool m_ChatTimeoutCode;
+	bool m_AnyPlayerFlag;
+	bool m_PingEx;
+	bool m_AllowDummy;
+	bool m_SyncWeaponInput;
 };
 
 class CClient : public IClient, public CDemoPlayer::IListener
@@ -88,55 +111,46 @@ class CClient : public IClient, public CDemoPlayer::IListener
 	IEngineInput *m_pInput;
 	IEngineGraphics *m_pGraphics;
 	IEngineSound *m_pSound;
+	IFavorites *m_pFavorites;
 	IGameClient *m_pGameClient;
 	IEngineMap *m_pMap;
+	IConfigManager *m_pConfigManager;
+	CConfig *m_pConfig;
 	IConsole *m_pConsole;
 	IStorage *m_pStorage;
 	IUpdater *m_pUpdater;
+	IDiscord *m_pDiscord;
 	ISteam *m_pSteam;
-	IEngineMasterServer *m_pMasterServer;
 
-	enum
-	{
-		NUM_SNAPSHOT_TYPES = 2,
-		PREDICTION_MARGIN = 1000 / 50 / 2, // magic network prediction value
-	};
+	CNetClient m_aNetClient[NUM_CONNS];
+	CDemoPlayer m_DemoPlayer;
+	CDemoRecorder m_aDemoRecorder[RECORDER_MAX];
+	CDemoEditor m_DemoEditor;
+	CGhostRecorder m_GhostRecorder;
+	CGhostLoader m_GhostLoader;
+	CServerBrowser m_ServerBrowser;
+	CUpdater m_Updater;
+	CFriends m_Friends;
+	CFriends m_Foes;
 
-	enum
-	{
-		CLIENT_MAIN = 0,
-		CLIENT_DUMMY,
-		CLIENT_CONTACT,
-		NUM_CLIENTS,
-	};
-
-	class CNetClient m_NetClient[NUM_CLIENTS];
-	class CDemoPlayer m_DemoPlayer;
-	class CDemoRecorder m_DemoRecorder[RECORDER_MAX];
-	class CDemoEditor m_DemoEditor;
-	class CGhostRecorder m_GhostRecorder;
-	class CGhostLoader m_GhostLoader;
-	class CServerBrowser m_ServerBrowser;
-	class CUpdater m_Updater;
-	class CFriends m_Friends;
-	class CFriends m_Foes;
-
-	char m_aServerAddressStr[256];
+	char m_aConnectAddressStr[MAX_SERVER_ADDRESSES * NETADDR_MAXSTRSIZE];
 
 	CUuid m_ConnectionID;
 
-	unsigned m_SnapshotParts[NUM_DUMMIES];
-	int64 m_LocalStartTime;
+	bool m_HaveGlobalTcpAddr = false;
+	NETADDR m_GlobalTcpAddr;
+
+	uint64_t m_aSnapshotParts[NUM_DUMMIES];
+	int64_t m_LocalStartTime;
 
 	IGraphics::CTextureHandle m_DebugFont;
 	int m_DebugSoundIndex = 0;
 
-	int64 m_LastRenderTime;
+	int64_t m_LastRenderTime;
 	float m_RenderFrameTimeLow;
 	float m_RenderFrameTimeHigh;
 	int m_RenderFrames;
 
-	NETADDR m_ServerAddress;
 	int m_SnapCrcErrors;
 	bool m_AutoScreenshotRecycle;
 	bool m_AutoStatScreenshotRecycle;
@@ -145,12 +159,12 @@ class CClient : public IClient, public CDemoPlayer::IListener
 	bool m_SoundInitFailed;
 	bool m_ResortServerBrowser;
 
-	int m_AckGameTick[NUM_DUMMIES];
-	int m_CurrentRecvTick[NUM_DUMMIES];
-	int m_RconAuthed[NUM_DUMMIES];
-	char m_RconPassword[32];
+	int m_aAckGameTick[NUM_DUMMIES];
+	int m_aCurrentRecvTick[NUM_DUMMIES];
+	int m_aRconAuthed[NUM_DUMMIES];
+	char m_aRconPassword[32];
 	int m_UseTempRconCommands;
-	char m_Password[32];
+	char m_aPassword[32];
 	bool m_SendPassword;
 	bool m_ButtonRender = false;
 
@@ -158,25 +172,26 @@ class CClient : public IClient, public CDemoPlayer::IListener
 	char m_aVersionStr[10];
 
 	// pinging
-	int64 m_PingStartTime;
+	int64_t m_PingStartTime;
 
-	char m_aCurrentMap[MAX_PATH_LENGTH];
-	char m_aCurrentMapPath[MAX_PATH_LENGTH];
+	char m_aCurrentMap[IO_MAX_PATH_LENGTH];
+	char m_aCurrentMapPath[IO_MAX_PATH_LENGTH];
 
 	char m_aTimeoutCodes[NUM_DUMMIES][32];
-	bool m_aTimeoutCodeSent[NUM_DUMMIES];
+	bool m_aCodeRunAfterJoin[NUM_DUMMIES];
 	bool m_GenerateTimeoutSeed;
 
 	//
 	char m_aCmdConnect[256];
-	char m_aCmdPlayDemo[MAX_PATH_LENGTH];
-	char m_aCmdEditMap[MAX_PATH_LENGTH];
+	char m_aCmdPlayDemo[IO_MAX_PATH_LENGTH];
+	char m_aCmdEditMap[IO_MAX_PATH_LENGTH];
 
 	// map download
-	std::shared_ptr<CGetFile> m_pMapdownloadTask;
+	std::shared_ptr<CHttpRequest> m_pMapdownloadTask;
 	char m_aMapdownloadFilename[256];
+	char m_aMapdownloadFilenameTemp[256];
 	char m_aMapdownloadName[256];
-	IOHANDLE m_MapdownloadFile;
+	IOHANDLE m_MapdownloadFileTemp;
 	int m_MapdownloadChunk;
 	int m_MapdownloadCrc;
 	int m_MapdownloadAmount;
@@ -190,12 +205,10 @@ class CClient : public IClient, public CDemoPlayer::IListener
 	SHA256_DIGEST m_MapDetailsSha256;
 
 	char m_aDDNetInfoTmp[64];
-	std::shared_ptr<CGetFile> m_pDDNetInfoTask;
-
-	char m_aDummyNameBuf[16];
+	std::shared_ptr<CHttpRequest> m_pDDNetInfoTask;
 
 	// time
-	CSmoothTime m_GameTime[NUM_DUMMIES];
+	CSmoothTime m_aGameTime[NUM_DUMMIES];
 	CSmoothTime m_PredictedTime;
 
 	// input
@@ -203,11 +216,12 @@ class CClient : public IClient, public CDemoPlayer::IListener
 	{
 		int m_aData[MAX_INPUT_SIZE]; // the input data
 		int m_Tick; // the tick that the input is for
-		int64 m_PredictedTime; // prediction latency when we sent this input
-		int64 m_Time;
+		int64_t m_PredictedTime; // prediction latency when we sent this input
+		int64_t m_PredictionMargin; // prediction margin when we sent this input
+		int64_t m_Time;
 	} m_aInputs[NUM_DUMMIES][200];
 
-	int m_CurrentInput[NUM_DUMMIES];
+	int m_aCurrentInput[NUM_DUMMIES];
 	bool m_LastDummy;
 	bool m_DummySendConnInfo;
 
@@ -217,18 +231,19 @@ class CClient : public IClient, public CDemoPlayer::IListener
 	CGraph m_FpsGraph;
 
 	// the game snapshots are modifiable by the game
-	class CSnapshotStorage m_SnapshotStorage[NUM_DUMMIES];
-	CSnapshotStorage::CHolder *m_aSnapshots[NUM_DUMMIES][NUM_SNAPSHOT_TYPES];
+	CSnapshotStorage m_aSnapshotStorage[NUM_DUMMIES];
+	CSnapshotStorage::CHolder *m_aapSnapshots[NUM_DUMMIES][NUM_SNAPSHOT_TYPES];
 
-	int m_ReceivedSnapshots[NUM_DUMMIES];
-	char m_aSnapshotIncomingData[CSnapshot::MAX_SIZE];
+	int m_aReceivedSnapshots[NUM_DUMMIES];
+	char m_aaSnapshotIncomingData[NUM_DUMMIES][CSnapshot::MAX_SIZE];
+	int m_aSnapshotIncomingDataSize[NUM_DUMMIES];
 
-	class CSnapshotStorage::CHolder m_aDemorecSnapshotHolders[NUM_SNAPSHOT_TYPES];
-	char *m_aDemorecSnapshotData[NUM_SNAPSHOT_TYPES][2][CSnapshot::MAX_SIZE];
+	CSnapshotStorage::CHolder m_aDemorecSnapshotHolders[NUM_SNAPSHOT_TYPES];
+	char *m_aaapDemorecSnapshotData[NUM_SNAPSHOT_TYPES][2][CSnapshot::MAX_SIZE];
 
-	class CSnapshotDelta m_SnapshotDelta;
+	CSnapshotDelta m_SnapshotDelta;
 
-	std::list<std::shared_ptr<CDemoEdit>> m_EditJobs;
+	std::list<std::shared_ptr<CDemoEdit>> m_lpEditJobs;
 
 	//
 	bool m_CanReceiveServerCapabilities;
@@ -237,8 +252,15 @@ class CClient : public IClient, public CDemoPlayer::IListener
 
 	bool ShouldSendChatTimeoutCodeHeuristic();
 
-	class CServerInfo m_CurrentServerInfo;
-	int64 m_CurrentServerInfoRequestTime; // >= 0 should request, == -1 got info
+	CServerInfo m_CurrentServerInfo;
+	int64_t m_CurrentServerInfoRequestTime; // >= 0 should request, == -1 got info
+
+	int m_CurrentServerPingInfoType;
+	int m_CurrentServerPingBasicToken;
+	int m_CurrentServerPingToken;
+	CUuid m_CurrentServerPingUuid;
+	int64_t m_CurrentServerCurrentPingTime; // >= 0 request running
+	int64_t m_CurrentServerNextPingTime; // >= 0 should request
 
 	// version info
 	struct CVersionInfo
@@ -254,15 +276,31 @@ class CClient : public IClient, public CDemoPlayer::IListener
 		class CHostLookup m_VersionServeraddr;
 	} m_VersionInfo;
 
-	volatile int m_GfxState;
 	static void GraphicsThreadProxy(void *pThis) { ((CClient *)pThis)->GraphicsThread(); }
 	void GraphicsThread();
 
-	std::vector<SWarning> m_Warnings;
+	std::vector<SWarning> m_vWarnings;
 
 #if defined(CONF_FAMILY_UNIX)
 	CFifo m_Fifo;
 #endif
+
+	IOHANDLE m_BenchmarkFile;
+	int64_t m_BenchmarkStopTime;
+
+	CChecksum m_Checksum;
+	int m_OwnExecutableSize = 0;
+	IOHANDLE m_OwnExecutable;
+
+	// favorite command handling
+	bool m_FavoritesGroup = false;
+	bool m_FavoritesGroupAllowPing = false;
+	int m_FavoritesGroupNum = 0;
+	NETADDR m_aFavoritesGroupAddresses[MAX_SERVER_ADDRESSES];
+
+	void UpdateDemoIntraTimers();
+	int MaxLatencyTicks() const;
+	int PredictionMargin() const;
 
 public:
 	IEngine *Engine() { return m_pEngine; }
@@ -270,112 +308,117 @@ public:
 	IEngineInput *Input() { return m_pInput; }
 	IEngineSound *Sound() { return m_pSound; }
 	IGameClient *GameClient() { return m_pGameClient; }
-	IEngineMasterServer *MasterServer() { return m_pMasterServer; }
+	IConfigManager *ConfigManager() { return m_pConfigManager; }
+	CConfig *Config() { return m_pConfig; }
 	IStorage *Storage() { return m_pStorage; }
 	IUpdater *Updater() { return m_pUpdater; }
+	IDiscord *Discord() { return m_pDiscord; }
 	ISteam *Steam() { return m_pSteam; }
 
 	CClient();
 
 	// ----- send functions -----
-	virtual int SendMsg(CMsgPacker *pMsg, int Flags);
-	virtual int SendMsgY(CMsgPacker *pMsg, int Flags, int NetClient = 1);
+	int SendMsg(int Conn, CMsgPacker *pMsg, int Flags) override;
+	// Send via the currently active client (main/dummy)
+	int SendMsgActive(CMsgPacker *pMsg, int Flags) override;
 
 	void SendInfo();
-	void SendEnterGame();
+	void SendEnterGame(int Conn);
 	void SendReady();
 	void SendMapRequest();
 
-	virtual bool RconAuthed() { return m_RconAuthed[g_Config.m_ClDummy] != 0; }
-	virtual bool UseTempRconCommands() { return m_UseTempRconCommands != 0; }
-	void RconAuth(const char *pName, const char *pPassword);
-	virtual void Rcon(const char *pCmd);
+	bool RconAuthed() const override { return m_aRconAuthed[g_Config.m_ClDummy] != 0; }
+	bool UseTempRconCommands() const override { return m_UseTempRconCommands != 0; }
+	void RconAuth(const char *pName, const char *pPassword) override;
+	void Rcon(const char *pCmd) override;
 
-	virtual bool ConnectionProblems();
+	bool ConnectionProblems() const override;
 
-	virtual bool SoundInitFailed() { return m_SoundInitFailed; }
+	bool SoundInitFailed() const override { return m_SoundInitFailed; }
 
-	virtual IGraphics::CTextureHandle GetDebugFont() { return m_DebugFont; }
+	IGraphics::CTextureHandle GetDebugFont() const override { return m_DebugFont; }
 
 	void DirectInput(int *pInput, int Size);
 	void SendInput();
 
 	// TODO: OPT: do this a lot smarter!
-	virtual int *GetInput(int Tick, int IsDummy);
-	virtual int *GetDirectInput(int Tick, int IsDummy);
+	int *GetInput(int Tick, int IsDummy) const override;
 
-	const char *LatestVersion();
+	const char *LatestVersion() const override;
 
 	// ------ state handling -----
-	void SetState(int s);
+	void SetState(EClientState s);
 
 	// called when the map is loaded and we should init for a new round
-	void OnEnterGame();
-	virtual void EnterGame();
+	void OnEnterGame(bool Dummy);
+	void EnterGame(int Conn) override;
 
-	virtual void Connect(const char *pAddress, const char *pPassword = NULL);
+	void Connect(const char *pAddress, const char *pPassword = nullptr) override;
 	void DisconnectWithReason(const char *pReason);
-	virtual void Disconnect();
+	void Disconnect() override;
 
-	virtual void DummyDisconnect(const char *pReason);
-	virtual void DummyConnect();
-	virtual bool DummyConnected();
-	virtual bool DummyConnecting();
+	void DummyDisconnect(const char *pReason) override;
+	void DummyConnect() override;
+	bool DummyConnected() override;
+	bool DummyConnecting() override;
+	bool DummyAllowed() override;
 	int m_DummyConnected;
 	int m_LastDummyConnectTime;
 
-	virtual void GetServerInfo(CServerInfo *pServerInfo);
+	void GetServerInfo(CServerInfo *pServerInfo) const override;
 	void ServerInfoRequest();
 
 	int LoadData();
 
 	// ---
 
-	int GetPredictionTime();
-	void *SnapGetItem(int SnapID, int Index, CSnapItem *pItem);
-	int SnapItemSize(int SnapID, int Index);
-	void SnapInvalidateItem(int SnapID, int Index);
-	void *SnapFindItem(int SnapID, int Type, int ID);
-	int SnapNumItems(int SnapID);
-	void SnapSetStaticsize(int ItemType, int Size);
+	int GetPredictionTime() override;
+	void *SnapGetItem(int SnapID, int Index, CSnapItem *pItem) const override;
+	int SnapItemSize(int SnapID, int Index) const override;
+	void SnapInvalidateItem(int SnapID, int Index) override;
+	void *SnapFindItem(int SnapID, int Type, int ID) const override;
+	int SnapNumItems(int SnapID) const override;
+	void SnapSetStaticsize(int ItemType, int Size) override;
 
 	void Render();
 	void DebugRender();
 
-	virtual void Restart();
-	virtual void Quit();
+	void Restart() override;
+	void Quit() override;
 
-	virtual const char *PlayerName();
-	virtual const char *DummyName();
-	virtual const char *ErrorString();
+	const char *PlayerName() const override;
+	const char *DummyName() const override;
+	const char *ErrorString() const override;
 
 	const char *LoadMap(const char *pName, const char *pFilename, SHA256_DIGEST *pWantedSha256, unsigned WantedCrc);
 	const char *LoadMapSearch(const char *pMapName, SHA256_DIGEST *pWantedSha256, int WantedCrc);
 
-	static bool PlayerScoreNameLess(const CServerInfo::CClient &p0, const CServerInfo::CClient &p1);
-
 	void ProcessConnlessPacket(CNetChunk *pPacket);
 	void ProcessServerInfo(int Type, NETADDR *pFrom, const void *pData, int DataSize);
-	void ProcessServerPacket(CNetChunk *pPacket);
-	void ProcessServerPacketDummy(CNetChunk *pPacket);
+	void ProcessServerPacket(CNetChunk *pPacket, int Conn, bool Dummy);
+
+	int UnpackAndValidateSnapshot(CSnapshot *pFrom, CSnapshot *pTo);
 
 	void ResetMapDownload();
 	void FinishMapDownload();
 
-	void RequestDDNetInfo();
+	void RequestDDNetInfo() override;
 	void ResetDDNetInfo();
 	bool IsDDNetInfoChanged();
 	void FinishDDNetInfo();
 	void LoadDDNetInfo();
 
-	virtual const char *MapDownloadName() { return m_aMapdownloadName; }
-	virtual int MapDownloadAmount() { return !m_pMapdownloadTask ? m_MapdownloadAmount : (int)m_pMapdownloadTask->Current(); }
-	virtual int MapDownloadTotalsize() { return !m_pMapdownloadTask ? m_MapdownloadTotalsize : (int)m_pMapdownloadTask->Size(); }
+	const NETADDR &ServerAddress() const override { return *m_aNetClient[CONN_MAIN].ServerAddress(); }
+	int ConnectNetTypes() const override;
+	const char *ConnectAddressString() const override { return m_aConnectAddressStr; }
+	const char *MapDownloadName() const override { return m_aMapdownloadName; }
+	int MapDownloadAmount() const override { return !m_pMapdownloadTask ? m_MapdownloadAmount : (int)m_pMapdownloadTask->Current(); }
+	int MapDownloadTotalsize() const override { return !m_pMapdownloadTask ? m_MapdownloadTotalsize : (int)m_pMapdownloadTask->Size(); }
 
 	void PumpNetwork();
 
-	virtual void OnDemoPlayerSnapshot(void *pData, int Size);
-	virtual void OnDemoPlayerMessage(void *pData, int Size);
+	void OnDemoPlayerSnapshot(void *pData, int Size) override;
+	void OnDemoPlayerMessage(void *pData, int Size) override;
 
 	void Update();
 
@@ -391,6 +434,7 @@ public:
 
 	static void Con_DummyConnect(IConsole::IResult *pResult, void *pUserData);
 	static void Con_DummyDisconnect(IConsole::IResult *pResult, void *pUserData);
+	static void Con_DummyResetInput(IConsole::IResult *pResult, void *pUserData);
 
 	static void Con_Quit(IConsole::IResult *pResult, void *pUserData);
 	static void Con_DemoPlay(IConsole::IResult *pResult, void *pUserData);
@@ -398,29 +442,34 @@ public:
 	static void Con_Minimize(IConsole::IResult *pResult, void *pUserData);
 	static void Con_Ping(IConsole::IResult *pResult, void *pUserData);
 	static void Con_Screenshot(IConsole::IResult *pResult, void *pUserData);
+	static void Con_Reset(IConsole::IResult *pResult, void *pUserData);
 
 #if defined(CONF_VIDEORECORDER)
-	static void StartVideo(IConsole::IResult *pResult, void *pUserData, const char *pVideName);
+	static void StartVideo(IConsole::IResult *pResult, void *pUserData, const char *pVideoName);
 	static void Con_StartVideo(IConsole::IResult *pResult, void *pUserData);
 	static void Con_StopVideo(IConsole::IResult *pResult, void *pUserData);
-	const char *DemoPlayer_Render(const char *pFilename, int StorageType, const char *pVideoName, int SpeedIndex);
+	const char *DemoPlayer_Render(const char *pFilename, int StorageType, const char *pVideoName, int SpeedIndex) override;
 #endif
 
 	static void Con_Rcon(IConsole::IResult *pResult, void *pUserData);
 	static void Con_RconAuth(IConsole::IResult *pResult, void *pUserData);
 	static void Con_RconLogin(IConsole::IResult *pResult, void *pUserData);
+	static void Con_BeginFavoriteGroup(IConsole::IResult *pResult, void *pUserData);
+	static void Con_EndFavoriteGroup(IConsole::IResult *pResult, void *pUserData);
 	static void Con_AddFavorite(IConsole::IResult *pResult, void *pUserData);
 	static void Con_RemoveFavorite(IConsole::IResult *pResult, void *pUserData);
 	static void Con_Play(IConsole::IResult *pResult, void *pUserData);
 	static void Con_Record(IConsole::IResult *pResult, void *pUserData);
 	static void Con_StopRecord(IConsole::IResult *pResult, void *pUserData);
 	static void Con_AddDemoMarker(IConsole::IResult *pResult, void *pUserData);
+	static void Con_BenchmarkQuit(IConsole::IResult *pResult, void *pUserData);
 	static void ConchainServerBrowserUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainFullscreen(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainWindowBordered(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainWindowScreen(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainWindowVSync(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainTimeoutSeed(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainLoglevel(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainPassword(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainReplays(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
@@ -431,65 +480,73 @@ public:
 
 	void RegisterCommands();
 
-	const char *DemoPlayer_Play(const char *pFilename, int StorageType);
-	void DemoRecorder_Start(const char *pFilename, bool WithTimestamp, int Recorder);
-	void DemoRecorder_HandleAutoStart();
+	const char *DemoPlayer_Play(const char *pFilename, int StorageType) override;
+	void DemoRecorder_Start(const char *pFilename, bool WithTimestamp, int Recorder) override;
+	void DemoRecorder_HandleAutoStart() override;
 	void DemoRecorder_StartReplayRecorder();
-	void DemoRecorder_Stop(int Recorder, bool RemoveFile = false);
+	void DemoRecorder_Stop(int Recorder, bool RemoveFile = false) override;
 	void DemoRecorder_AddDemoMarker(int Recorder);
-	class IDemoRecorder *DemoRecorder(int Recorder);
+	IDemoRecorder *DemoRecorder(int Recorder) override;
 
-	void AutoScreenshot_Start();
-	void AutoStatScreenshot_Start();
+	void AutoScreenshot_Start() override;
+	void AutoStatScreenshot_Start() override;
 	void AutoScreenshot_Cleanup();
 	void AutoStatScreenshot_Cleanup();
 
-	void AutoCSV_Start();
+	void AutoCSV_Start() override;
 	void AutoCSV_Cleanup();
 
-	void ServerBrowserUpdate();
+	void ServerBrowserUpdate() override;
 
 	void HandleConnectAddress(const NETADDR *pAddr);
 	void HandleConnectLink(const char *pLink);
 	void HandleDemoPath(const char *pPath);
 	void HandleMapPath(const char *pPath);
 
+	virtual void InitChecksum();
+	virtual int HandleChecksum(int Conn, CUuid Uuid, CUnpacker *pUnpacker);
+
 	// gfx
-	void SwitchWindowScreen(int Index);
-	void ToggleFullscreen();
-	void ToggleWindowBordered();
-	void ToggleWindowVSync();
-	void LoadFont();
-	void Notify(const char *pTitle, const char *pMessage);
+	void SwitchWindowScreen(int Index) override;
+	void SetWindowParams(int FullscreenMode, bool IsBorderless, bool AllowResizing) override;
+	void ToggleWindowVSync() override;
+	void LoadFont() override;
+	void Notify(const char *pTitle, const char *pMessage) override;
+	void BenchmarkQuit(int Seconds, const char *pFilename);
+
+	void UpdateAndSwap() override;
 
 	// DDRace
 
-	virtual void GenerateTimeoutSeed();
-	void GenerateTimeoutCodes();
+	void GenerateTimeoutSeed() override;
+	void GenerateTimeoutCodes(const NETADDR *pAddrs, int NumAddrs);
 
-	virtual int GetCurrentRaceTime();
+	int GetCurrentRaceTime() override;
 
-	virtual const char *GetCurrentMap();
-	virtual const char *GetCurrentMapPath();
-	virtual SHA256_DIGEST GetCurrentMapSha256();
-	virtual unsigned GetCurrentMapCrc();
+	const char *GetCurrentMap() const override;
+	const char *GetCurrentMapPath() const override;
+	SHA256_DIGEST GetCurrentMapSha256() const override;
+	unsigned GetCurrentMapCrc() const override;
 
-	virtual void RaceRecord_Start(const char *pFilename);
-	virtual void RaceRecord_Stop();
-	virtual bool RaceRecord_IsRecording();
+	void RaceRecord_Start(const char *pFilename) override;
+	void RaceRecord_Stop() override;
+	bool RaceRecord_IsRecording() override;
 
-	virtual void DemoSliceBegin();
-	virtual void DemoSliceEnd();
-	virtual void DemoSlice(const char *pDstPath, CLIENTFUNC_FILTER pfnFilter, void *pUser);
-	virtual void SaveReplay(const int Length);
+	void DemoSliceBegin() override;
+	void DemoSliceEnd() override;
+	void DemoSlice(const char *pDstPath, CLIENTFUNC_FILTER pfnFilter, void *pUser) override;
+	virtual void SaveReplay(int Length, const char *pFilename = "");
 
-	virtual bool EditorHasUnsavedData() { return m_pEditor->HasUnsavedData(); }
+	bool EditorHasUnsavedData() const override { return m_pEditor->HasUnsavedData(); }
 
-	virtual IFriends *Foes() { return &m_Foes; }
+	IFriends *Foes() override { return &m_Foes; }
 
-	virtual void GetSmoothTick(int *pSmoothTick, float *pSmoothIntraTick, float MixAmount);
+	void GetSmoothTick(int *pSmoothTick, float *pSmoothIntraTick, float MixAmount) override;
 
-	virtual SWarning *GetCurWarning();
+	SWarning *GetCurWarning() override;
+	CChecksumData *ChecksumData() override { return &m_Checksum.m_Data; }
+	bool InfoTaskRunning() override { return m_pDDNetInfoTask != nullptr; }
+	int UdpConnectivity(int NetType) override;
 };
 
 #endif

@@ -23,20 +23,20 @@ struct CGhostHeader
 
 	int GetTicks() const
 	{
-		return (m_aNumTicks[0] << 24) | (m_aNumTicks[1] << 16) | (m_aNumTicks[2] << 8) | (m_aNumTicks[3]);
+		return bytes_be_to_int(m_aNumTicks);
 	}
 
 	int GetTime() const
 	{
-		return (m_aTime[0] << 24) | (m_aTime[1] << 16) | (m_aTime[2] << 8) | (m_aTime[3]);
+		return bytes_be_to_int(m_aTime);
 	}
 
 	CGhostInfo ToGhostInfo() const
 	{
 		CGhostInfo Result;
 		mem_zero(&Result, sizeof(Result));
-		str_copy(Result.m_aOwner, m_aOwner, sizeof(Result.m_aOwner));
-		str_copy(Result.m_aMap, m_aMap, sizeof(Result.m_aMap));
+		str_copy(Result.m_aOwner, m_aOwner);
+		str_copy(Result.m_aMap, m_aMap);
 		Result.m_NumTicks = GetTicks();
 		Result.m_Time = GetTime();
 		return Result;
@@ -76,11 +76,11 @@ public:
 
 	void Init();
 
-	int Start(const char *pFilename, const char *pMap, SHA256_DIGEST MapSha256, const char *pName);
-	int Stop(int Ticks, int Time);
+	int Start(const char *pFilename, const char *pMap, SHA256_DIGEST MapSha256, const char *pName) override;
+	int Stop(int Ticks, int Time) override;
 
-	void WriteData(int Type, const void *pData, int Size);
-	bool IsRecording() const { return m_File != 0; }
+	void WriteData(int Type, const void *pData, int Size) override;
+	bool IsRecording() const override { return m_File != nullptr; }
 };
 
 class CGhostLoader : public IGhostLoader
@@ -108,13 +108,13 @@ public:
 
 	void Init();
 
-	int Load(const char *pFilename, const char *pMap, SHA256_DIGEST MapSha256, unsigned MapCrc);
-	void Close();
-	const CGhostInfo *GetInfo() const { return &m_Info; }
+	int Load(const char *pFilename, const char *pMap, SHA256_DIGEST MapSha256, unsigned MapCrc) override;
+	void Close() override;
+	const CGhostInfo *GetInfo() const override { return &m_Info; }
 
-	bool ReadNextType(int *pType);
-	bool ReadData(int Type, void *pData, int Size);
+	bool ReadNextType(int *pType) override;
+	bool ReadData(int Type, void *pData, int Size) override;
 
-	bool GetGhostInfo(const char *pFilename, CGhostInfo *pGhostInfo, const char *pMap, SHA256_DIGEST MapSha256, unsigned MapCrc);
+	bool GetGhostInfo(const char *pFilename, CGhostInfo *pGhostInfo, const char *pMap, SHA256_DIGEST MapSha256, unsigned MapCrc) override;
 };
 #endif

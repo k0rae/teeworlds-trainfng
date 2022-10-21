@@ -115,10 +115,10 @@ protected:
 		bool IsFull() const { return m_CountUsed == MAX_BANS; }
 
 		CBan<CDataType> *First() const { return m_pFirstUsed; }
-		CBan<CDataType> *First(const CNetHash *pNetHash) const { return m_paaHashList[pNetHash->m_HashIndex][pNetHash->m_Hash]; }
+		CBan<CDataType> *First(const CNetHash *pNetHash) const { return m_aapHashList[pNetHash->m_HashIndex][pNetHash->m_Hash]; }
 		CBan<CDataType> *Find(const CDataType *pData, const CNetHash *pNetHash) const
 		{
-			for(CBan<CDataType> *pBan = m_paaHashList[pNetHash->m_HashIndex][pNetHash->m_Hash]; pBan; pBan = pBan->m_pHashNext)
+			for(CBan<CDataType> *pBan = m_aapHashList[pNetHash->m_HashIndex][pNetHash->m_Hash]; pBan; pBan = pBan->m_pHashNext)
 			{
 				if(NetComp(&pBan->m_Data, pData) == 0)
 					return pBan;
@@ -134,7 +134,7 @@ protected:
 			MAX_BANS = 1024,
 		};
 
-		CBan<CDataType> *m_paaHashList[HashCount][256];
+		CBan<CDataType> *m_aapHashList[HashCount][256];
 		CBan<CDataType> m_aBans[MAX_BANS];
 		CBan<CDataType> *m_pFirstFree;
 		CBan<CDataType> *m_pFirstUsed;
@@ -181,7 +181,7 @@ public:
 	int UnbanByRange(const CNetRange *pRange);
 	int UnbanByIndex(int Index);
 	void UnbanAll();
-	bool IsBanned(const NETADDR *pAddr, char *pBuf, unsigned BufferSize) const;
+	bool IsBanned(const NETADDR *pOrigAddr, char *pBuf, unsigned BufferSize) const;
 
 	static void ConBan(class IConsole::IResult *pResult, void *pUser);
 	static void ConBanRange(class IConsole::IResult *pResult, void *pUser);
@@ -205,7 +205,7 @@ void CNetBan::MakeBanInfo(const CBan<T> *pBan, char *pBuf, unsigned BuffSize, in
 	// build type based part
 	char aBuf[256];
 	if(Type == MSGTYPE_PLAYER)
-		str_copy(aBuf, "You have been banned", sizeof(aBuf));
+		str_copy(aBuf, "You have been banned");
 	else
 	{
 		char aTemp[256];
@@ -235,7 +235,7 @@ void CNetBan::MakeBanInfo(const CBan<T> *pBan, char *pBuf, unsigned BuffSize, in
 			str_format(pBuf, BuffSize, "%s for %d minutes (%s)", aBuf, Mins, pBan->m_Info.m_aReason);
 	}
 	else
-		str_format(pBuf, BuffSize, "%s for life (%s)", aBuf, pBan->m_Info.m_aReason);
+		str_format(pBuf, BuffSize, "%s (%s)", aBuf, pBan->m_Info.m_aReason);
 }
 
 #endif

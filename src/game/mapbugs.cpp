@@ -50,11 +50,11 @@ CMapBugs GetMapBugs(const char *pName, int Size, SHA256_DIGEST Sha256)
 	CMapDescription Map = {pName, Size, Sha256};
 	CMapBugs Result;
 	Result.m_Extra = 0;
-	for(unsigned int i = 0; i < sizeof(MAP_BUGS) / sizeof(MAP_BUGS[0]); i++)
+	for(auto &MapBug : MAP_BUGS)
 	{
-		if(Map == MAP_BUGS[i].m_Map)
+		if(Map == MapBug.m_Map)
 		{
-			Result.m_pData = &MAP_BUGS[i];
+			Result.m_pData = &MapBug;
 			return Result;
 		}
 	}
@@ -76,9 +76,9 @@ int CMapBugs::Update(const char *pBug)
 {
 	CMapBugsInternal *pInternal = (CMapBugsInternal *)m_pData;
 	int Bug = -1;
-	if(false) {}
+	if(false) {} // NOLINT(readability-simplify-boolean-expr)
 #define MAPBUG(constname, string) \
-	else if(str_comp(pBug, string) == 0) { Bug = constname; }
+	else if(str_comp(pBug, string) == 0) { Bug = (constname); }
 #include "mapbugs_list.h"
 #undef MAPBUG
 	if(Bug == -1)

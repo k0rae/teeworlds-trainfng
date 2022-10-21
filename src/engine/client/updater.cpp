@@ -1,27 +1,28 @@
 #include "updater.h"
+#include <base/lock_scope.h>
 #include <base/system.h>
 #include <engine/client.h>
 #include <engine/engine.h>
 #include <engine/external/json-parser/json.h>
+#include <engine/shared/http.h>
 #include <engine/shared/json.h>
 #include <engine/storage.h>
-#include <game/version.h>
 
-#include <stdlib.h> // system
+#include <cstdlib> // system
 
 using std::map;
 using std::string;
 
-class CUpdaterFetchTask : public CGetFile
+class CUpdaterFetchTask : public CHttpRequest
 {
 	char m_aBuf[256];
 	char m_aBuf2[256];
 	CUpdater *m_pUpdater;
 
-	virtual void OnProgress();
+	void OnProgress() override;
 
 protected:
-	virtual int OnCompletion(int State);
+	int OnCompletion(int State) override;
 
 public:
 	CUpdaterFetchTask(CUpdater *pUpdater, const char *pFile, const char *pDestPath);
@@ -44,36 +45,36 @@ static const char *GetUpdaterDestPath(char *pBuf, int BufSize, const char *pFile
 }
 
 CUpdaterFetchTask::CUpdaterFetchTask(CUpdater *pUpdater, const char *pFile, const char *pDestPath) :
-	CGetFile(pUpdater->m_pStorage, GetUpdaterUrl(m_aBuf, sizeof(m_aBuf), pFile), GetUpdaterDestPath(m_aBuf2, sizeof(m_aBuf), pFile, pDestPath), -2, CTimeout{0, 0, 0}),
+	CHttpRequest(GetUpdaterUrl(m_aBuf, sizeof(m_aBuf), pFile)),
 	m_pUpdater(pUpdater)
 {
+	WriteToFile(pUpdater->m_pStorage, GetUpdaterDestPath(m_aBuf2, sizeof(m_aBuf2), pFile, pDestPath), -2);
 }
 
 void CUpdaterFetchTask::OnProgress()
 {
-	lock_wait(m_pUpdater->m_Lock);
-	str_copy(m_pUpdater->m_aStatus, Dest(), sizeof(m_pUpdater->m_aStatus));
+	CLockScope ls(m_pUpdater->m_Lock);
+	str_copy(m_pUpdater->m_aStatus, Dest());
 	m_pUpdater->m_Percent = Progress();
-	lock_unlock(m_pUpdater->m_Lock);
 }
 
 int CUpdaterFetchTask::OnCompletion(int State)
 {
-	State = CGetFile::OnCompletion(State);
+	State = CHttpRequest::OnCompletion(State);
 
-	const char *b = 0;
-	for(const char *a = Dest(); *a; a++)
-		if(*a == '/')
-			b = a + 1;
-	b = b ? b : Dest();
-	if(!str_comp(b, "update.json"))
+	const char *pFileName = 0;
+	for(const char *pPath = Dest(); *pPath; pPath++)
+		if(*pPath == '/')
+			pFileName = pPath + 1;
+	pFileName = pFileName ? pFileName : Dest();
+	if(!str_comp(pFileName, "update.json"))
 	{
 		if(State == HTTP_DONE)
 			m_pUpdater->SetCurrentState(IUpdater::GOT_MANIFEST);
 		else if(State == HTTP_ERROR)
 			m_pUpdater->SetCurrentState(IUpdater::FAIL);
 	}
-	else if(!str_comp(b, m_pUpdater->m_aLastFile))
+	else if(!str_comp(pFileName, m_pUpdater->m_aLastFile))
 	{
 		if(State == HTTP_DONE)
 			m_pUpdater->SetCurrentState(IUpdater::MOVE_FILES);
@@ -93,8 +94,8 @@ CUpdater::CUpdater()
 	m_Percent = 0;
 	m_Lock = lock_create();
 
-	str_format(m_aClientExecTmp, sizeof(m_aClientExecTmp), CLIENT_EXEC ".%d.tmp", pid());
-	str_format(m_aServerExecTmp, sizeof(m_aServerExecTmp), SERVER_EXEC ".%d.tmp", pid());
+	IStorage::FormatTmpPath(m_aClientExecTmp, sizeof(m_aClientExecTmp), CLIENT_EXEC);
+	IStorage::FormatTmpPath(m_aServerExecTmp, sizeof(m_aServerExecTmp), SERVER_EXEC);
 }
 
 void CUpdater::Init()
@@ -102,7 +103,6 @@ void CUpdater::Init()
 	m_pClient = Kernel()->RequestInterface<IClient>();
 	m_pStorage = Kernel()->RequestInterface<IStorage>();
 	m_pEngine = Kernel()->RequestInterface<IEngine>();
-	m_IsWinXP = os_is_winxp_or_lower();
 }
 
 CUpdater::~CUpdater()
@@ -112,32 +112,26 @@ CUpdater::~CUpdater()
 
 void CUpdater::SetCurrentState(int NewState)
 {
-	lock_wait(m_Lock);
+	CLockScope ls(m_Lock);
 	m_State = NewState;
-	lock_unlock(m_Lock);
 }
 
 int CUpdater::GetCurrentState()
 {
-	lock_wait(m_Lock);
-	int Result = m_State;
-	lock_unlock(m_Lock);
-	return Result;
+	CLockScope ls(m_Lock);
+	return m_State;
 }
 
 void CUpdater::GetCurrentFile(char *pBuf, int BufSize)
 {
-	lock_wait(m_Lock);
+	CLockScope ls(m_Lock);
 	str_copy(pBuf, m_aStatus, BufSize);
-	lock_unlock(m_Lock);
 }
 
 int CUpdater::GetCurrentPercent()
 {
-	lock_wait(m_Lock);
-	int Result = m_Percent;
-	lock_unlock(m_Lock);
-	return Result;
+	CLockScope ls(m_Lock);
+	return m_Percent;
 }
 
 void CUpdater::FetchFile(const char *pFile, const char *pDestPath)
@@ -153,6 +147,11 @@ bool CUpdater::MoveFile(const char *pFile)
 
 #if !defined(CONF_FAMILY_WINDOWS)
 	if(!str_comp_nocase(pFile + len - 4, ".dll"))
+		return Success;
+#endif
+
+#if !defined(CONF_PLATFORM_LINUX)
+	if(!str_comp_nocase(pFile + len - 3, ".so"))
 		return Success;
 #endif
 
@@ -196,16 +195,13 @@ bool CUpdater::ReplaceClient()
 {
 	dbg_msg("updater", "replacing " PLAT_CLIENT_EXEC);
 	bool Success = true;
-	char aPath[512];
+	char aPath[IO_MAX_PATH_LENGTH];
 
 	// Replace running executable by renaming twice...
-	if(!m_IsWinXP)
-	{
-		m_pStorage->RemoveBinaryFile(CLIENT_EXEC ".old");
-		Success &= m_pStorage->RenameBinaryFile(PLAT_CLIENT_EXEC, CLIENT_EXEC ".old");
-		str_format(aPath, sizeof(aPath), "update/%s", m_aClientExecTmp);
-		Success &= m_pStorage->RenameBinaryFile(aPath, PLAT_CLIENT_EXEC);
-	}
+	m_pStorage->RemoveBinaryFile(CLIENT_EXEC ".old");
+	Success &= m_pStorage->RenameBinaryFile(PLAT_CLIENT_EXEC, CLIENT_EXEC ".old");
+	str_format(aPath, sizeof(aPath), "update/%s", m_aClientExecTmp);
+	Success &= m_pStorage->RenameBinaryFile(aPath, PLAT_CLIENT_EXEC);
 #if !defined(CONF_FAMILY_WINDOWS)
 	m_pStorage->GetBinaryPath(PLAT_CLIENT_EXEC, aPath, sizeof aPath);
 	char aBuf[512];
@@ -223,7 +219,7 @@ bool CUpdater::ReplaceServer()
 {
 	dbg_msg("updater", "replacing " PLAT_SERVER_EXEC);
 	bool Success = true;
-	char aPath[512];
+	char aPath[IO_MAX_PATH_LENGTH];
 
 	//Replace running executable by renaming twice...
 	m_pStorage->RemoveBinaryFile(SERVER_EXEC ".old");
@@ -245,18 +241,13 @@ bool CUpdater::ReplaceServer()
 
 void CUpdater::ParseUpdate()
 {
-	char aPath[512];
-	IOHANDLE File = m_pStorage->OpenFile(m_pStorage->GetBinaryPath("update/update.json", aPath, sizeof aPath), IOFLAG_READ, IStorage::TYPE_ALL);
-	if(!File)
+	char aPath[IO_MAX_PATH_LENGTH];
+	void *pBuf;
+	unsigned Length;
+	if(!m_pStorage->ReadFile(m_pStorage->GetBinaryPath("update/update.json", aPath, sizeof aPath), IStorage::TYPE_ABSOLUTE, &pBuf, &Length))
 		return;
 
-	long int Length = io_length(File);
-	char *pBuf = (char *)malloc(Length);
-	mem_zero(pBuf, Length);
-	io_read(File, pBuf, Length);
-	io_close(File);
-
-	json_value *pVersions = json_parse(pBuf, Length);
+	json_value *pVersions = json_parse((json_char *)pBuf, Length);
 	free(pBuf);
 
 	if(pVersions && pVersions->type == json_array)
@@ -312,11 +303,11 @@ void CUpdater::PerformUpdate()
 		}
 	}
 
-	for(map<string, bool>::iterator it = m_FileJobs.begin(); it != m_FileJobs.end(); ++it)
+	for(auto &FileJob : m_FileJobs)
 	{
-		if(it->second)
+		if(FileJob.second)
 		{
-			const char *pFile = it->first.c_str();
+			const char *pFile = FileJob.first.c_str();
 			size_t len = str_length(pFile);
 			if(!str_comp_nocase(pFile + len - 4, ".dll"))
 			{
@@ -347,7 +338,7 @@ void CUpdater::PerformUpdate()
 			pLastFile = pFile;
 		}
 		else
-			m_pStorage->RemoveBinaryFile(it->first.c_str());
+			m_pStorage->RemoveBinaryFile(FileJob.first.c_str());
 	}
 
 	if(m_ServerUpdate)
@@ -361,16 +352,16 @@ void CUpdater::PerformUpdate()
 		pLastFile = m_aClientExecTmp;
 	}
 
-	str_copy(m_aLastFile, pLastFile, sizeof(m_aLastFile));
+	str_copy(m_aLastFile, pLastFile);
 }
 
 void CUpdater::CommitUpdate()
 {
 	bool Success = true;
 
-	for(map<std::string, bool>::iterator it = m_FileJobs.begin(); it != m_FileJobs.end(); ++it)
-		if(it->second)
-			Success &= MoveFile(it->first.c_str());
+	for(auto &FileJob : m_FileJobs)
+		if(FileJob.second)
+			Success &= MoveFile(FileJob.first.c_str());
 
 	if(m_ClientUpdate)
 		Success &= ReplaceClient();
@@ -382,23 +373,6 @@ void CUpdater::CommitUpdate()
 		m_State = NEED_RESTART;
 	else
 	{
-		if(!m_IsWinXP)
-			m_pClient->Restart();
-		else
-			WinXpRestart();
+		m_pClient->Restart();
 	}
-}
-
-void CUpdater::WinXpRestart()
-{
-	char aBuf[512];
-	IOHANDLE bhFile = io_open(m_pStorage->GetBinaryPath("du.bat", aBuf, sizeof aBuf), IOFLAG_WRITE);
-	if(!bhFile)
-		return;
-	char bBuf[512];
-	str_format(bBuf, sizeof(bBuf), ":_R\r\ndel \"" PLAT_CLIENT_EXEC "\"\r\nif exist \"" PLAT_CLIENT_EXEC "\" goto _R\r\n:_T\r\nmove /y \"update\\%s\" \"" PLAT_CLIENT_EXEC "\"\r\nif not exist \"" PLAT_CLIENT_EXEC "\" goto _T\r\nstart " PLAT_CLIENT_EXEC "\r\ndel \"du.bat\"\r\n", m_aClientExecTmp);
-	io_write(bhFile, bBuf, str_length(bBuf));
-	io_close(bhFile);
-	shell_execute(aBuf);
-	m_pClient->Quit();
 }

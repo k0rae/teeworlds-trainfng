@@ -6,13 +6,15 @@
 
 class CEffects : public CComponent
 {
+	bool m_Add5hz;
 	bool m_Add50hz;
 	bool m_Add100hz;
 
 public:
 	CEffects();
+	virtual int Sizeof() const override { return sizeof(*this); }
 
-	virtual void OnRender();
+	virtual void OnRender() override;
 
 	void BulletTrail(vec2 Pos, float Alpha = 1.f, float TimePassed = 0.f);
 	void SmokeTrail(vec2 Pos, vec2 Vel, float Alpha = 1.f, float TimePassed = 0.f);
@@ -25,6 +27,7 @@ public:
 	void PlayerSpawn(vec2 Pos);
 	void PlayerDeath(vec2 Pos, int ClientID);
 	void PowerupShine(vec2 Pos, vec2 Size);
+	void FreezingFlakes(vec2 Pos, vec2 Size);
 
 	void Update();
 };

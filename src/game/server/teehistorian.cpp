@@ -8,6 +8,7 @@
 static const char TEEHISTORIAN_NAME[] = "teehistorian@ddnet.tw";
 static const CUuid TEEHISTORIAN_UUID = CalculateUuid(TEEHISTORIAN_NAME);
 static const char TEEHISTORIAN_VERSION[] = "2";
+static const char TEEHISTORIAN_VERSION_MINOR[] = "4";
 
 #define UUID(id, name) static const CUuid UUID_##id = CalculateUuid(name);
 #include <engine/shared/teehistorian_ex_chunks.h>
@@ -47,11 +48,18 @@ void CTeeHistorian::Reset(const CGameInfo *pGameInfo, WRITE_CALLBACK pfnWriteCal
 	// Tick 0 is implicit at the start, game starts as tick 1.
 	m_TickWritten = true;
 	m_MaxClientID = MAX_CLIENTS;
-	// `m_PrevMaxClientID` is initialized in `BeginTick`
-	for(int i = 0; i < MAX_CLIENTS; i++)
+
+	// `m_PrevMaxClientID` is initialized in `BeginPlayers`
+	for(auto &PrevPlayer : m_aPrevPlayers)
 	{
-		m_aPrevPlayers[i].m_Alive = false;
-		m_aPrevPlayers[i].m_InputExists = false;
+		PrevPlayer.m_Alive = false;
+		// zero means no id
+		PrevPlayer.m_UniqueClientID = 0;
+		PrevPlayer.m_Team = 0;
+	}
+	for(auto &PrevTeam : m_aPrevTeams)
+	{
+		PrevTeam.m_Practice = false;
 	}
 	m_pfnWriteCallback = pfnWriteCallback;
 	m_pWriteCallbackUserdata = pUser;
@@ -86,9 +94,26 @@ void CTeeHistorian::WriteHeader(const CGameInfo *pGameInfo)
 
 #define E(buf, str) EscapeJson(buf, sizeof(buf), str)
 
-	str_format(aJson, sizeof(aJson), "{\"comment\":\"%s\",\"version\":\"%s\",\"game_uuid\":\"%s\",\"server_version\":\"%s\",\"start_time\":\"%s\",\"server_name\":\"%s\",\"server_port\":\"%d\",\"game_type\":\"%s\",\"map_name\":\"%s\",\"map_size\":\"%d\",\"map_sha256\":\"%s\",\"map_crc\":\"%08x\",\"prng_description\":\"%s\",\"config\":{",
+	str_format(aJson, sizeof(aJson),
+		"{"
+		"\"comment\":\"%s\","
+		"\"version\":\"%s\","
+		"\"version_minor\":\"%s\","
+		"\"game_uuid\":\"%s\","
+		"\"server_version\":\"%s\","
+		"\"start_time\":\"%s\","
+		"\"server_name\":\"%s\","
+		"\"server_port\":\"%d\","
+		"\"game_type\":\"%s\","
+		"\"map_name\":\"%s\","
+		"\"map_size\":\"%d\","
+		"\"map_sha256\":\"%s\","
+		"\"map_crc\":\"%08x\","
+		"\"prng_description\":\"%s\","
+		"\"config\":{",
 		E(aCommentBuffer, TEEHISTORIAN_NAME),
 		TEEHISTORIAN_VERSION,
+		TEEHISTORIAN_VERSION_MINOR,
 		aGameUuid,
 		E(aServerVersionBuffer, pGameInfo->m_pServerVersion),
 		E(aStartTimeBuffer, aStartTime),
@@ -141,7 +166,7 @@ void CTeeHistorian::WriteHeader(const CGameInfo *pGameInfo)
 
 	First = true;
 
-	static const float TicksPerSecond = 50.0f;
+	const float TicksPerSecond = 50.0f;
 #define MACRO_TUNING_PARAM(Name, ScriptName, Value, Description) \
 	if(pGameInfo->m_pTuning->m_##Name.Get() != (int)((Value)*100)) \
 	{ \
@@ -204,6 +229,8 @@ void CTeeHistorian::BeginPlayers()
 	dbg_assert(m_State == STATE_BEFORE_PLAYERS, "invalid teehistorian state");
 
 	m_PrevMaxClientID = m_MaxClientID;
+	// ensure that PLAYER_{DIFF, NEW, OLD} don't cause an implicit tick after a TICK_SKIP
+	// by not overwriting m_MaxClientID during RecordPlayer
 	m_MaxClientID = -1;
 
 	m_State = STATE_PLAYERS;
@@ -230,7 +257,7 @@ void CTeeHistorian::RecordPlayer(int ClientID, const CNetObj_CharacterCore *pCha
 {
 	dbg_assert(m_State == STATE_PLAYERS, "invalid teehistorian state");
 
-	CPlayer *pPrev = &m_aPrevPlayers[ClientID];
+	CTeehistorianPlayer *pPrev = &m_aPrevPlayers[ClientID];
 	if(!pPrev->m_Alive || pPrev->m_X != pChar->m_X || pPrev->m_Y != pChar->m_Y)
 	{
 		EnsureTickWrittenPlayerData(ClientID);
@@ -273,7 +300,7 @@ void CTeeHistorian::RecordDeadPlayer(int ClientID)
 {
 	dbg_assert(m_State == STATE_PLAYERS, "invalid teehistorian state");
 
-	CPlayer *pPrev = &m_aPrevPlayers[ClientID];
+	CTeehistorianPlayer *pPrev = &m_aPrevPlayers[ClientID];
 	if(pPrev->m_Alive)
 	{
 		EnsureTickWrittenPlayerData(ClientID);
@@ -289,6 +316,50 @@ void CTeeHistorian::RecordDeadPlayer(int ClientID)
 		Write(Buffer.Data(), Buffer.Size());
 	}
 	pPrev->m_Alive = false;
+}
+
+void CTeeHistorian::RecordPlayerTeam(int ClientID, int Team)
+{
+	if(m_aPrevPlayers[ClientID].m_Team != Team)
+	{
+		m_aPrevPlayers[ClientID].m_Team = Team;
+
+		EnsureTickWritten();
+
+		CPacker Buffer;
+		Buffer.Reset();
+		Buffer.AddInt(ClientID);
+		Buffer.AddInt(Team);
+
+		if(m_Debug)
+		{
+			dbg_msg("teehistorian", "player_team cid=%d team=%d", ClientID, Team);
+		}
+
+		WriteExtra(UUID_TEEHISTORIAN_PLAYER_TEAM, Buffer.Data(), Buffer.Size());
+	}
+}
+
+void CTeeHistorian::RecordTeamPractice(int Team, bool Practice)
+{
+	if(m_aPrevTeams[Team].m_Practice != Practice)
+	{
+		m_aPrevTeams[Team].m_Practice = Practice;
+
+		EnsureTickWritten();
+
+		CPacker Buffer;
+		Buffer.Reset();
+		Buffer.AddInt(Team);
+		Buffer.AddInt(Practice);
+
+		if(m_Debug)
+		{
+			dbg_msg("teehistorian", "team_practice team=%d practice=%d", Team, Practice);
+		}
+
+		WriteExtra(UUID_TEEHISTORIAN_TEAM_PRACTICE, Buffer.Data(), Buffer.Size());
+	}
 }
 
 void CTeeHistorian::Write(const void *pData, int DataSize)
@@ -336,13 +407,13 @@ void CTeeHistorian::BeginInputs()
 	m_State = STATE_INPUTS;
 }
 
-void CTeeHistorian::RecordPlayerInput(int ClientID, const CNetObj_PlayerInput *pInput)
+void CTeeHistorian::RecordPlayerInput(int ClientID, uint32_t UniqueClientID, const CNetObj_PlayerInput *pInput)
 {
 	CPacker Buffer;
 
-	CPlayer *pPrev = &m_aPrevPlayers[ClientID];
+	CTeehistorianPlayer *pPrev = &m_aPrevPlayers[ClientID];
 	CNetObj_PlayerInput DiffInput;
-	if(pPrev->m_InputExists)
+	if(pPrev->m_UniqueClientID == UniqueClientID)
 	{
 		if(mem_comp(&pPrev->m_Input, pInput, sizeof(pPrev->m_Input)) == 0)
 		{
@@ -377,7 +448,7 @@ void CTeeHistorian::RecordPlayerInput(int ClientID, const CNetObj_PlayerInput *p
 	{
 		Buffer.AddInt(((int *)&DiffInput)[i]);
 	}
-	pPrev->m_InputExists = true;
+	pPrev->m_UniqueClientID = UniqueClientID;
 	pPrev->m_Input = *pInput;
 
 	Write(Buffer.Data(), Buffer.Size());
@@ -437,6 +508,22 @@ void CTeeHistorian::RecordPlayerJoin(int ClientID, int Protocol)
 	Write(Buffer.Data(), Buffer.Size());
 }
 
+void CTeeHistorian::RecordPlayerReady(int ClientID)
+{
+	EnsureTickWritten();
+
+	CPacker Buffer;
+	Buffer.Reset();
+	Buffer.AddInt(ClientID);
+
+	if(m_Debug)
+	{
+		dbg_msg("teehistorian", "player_ready cid=%d", ClientID);
+	}
+
+	WriteExtra(UUID_TEEHISTORIAN_PLAYER_READY, Buffer.Data(), Buffer.Size());
+}
+
 void CTeeHistorian::RecordPlayerDrop(int ClientID, const char *pReason)
 {
 	EnsureTickWritten();
@@ -489,8 +576,22 @@ void CTeeHistorian::RecordTestExtra()
 	WriteExtra(UUID_TEEHISTORIAN_TEST, "", 0);
 }
 
+void CTeeHistorian::RecordPlayerSwap(int ClientID1, int ClientID2)
+{
+	EnsureTickWritten();
+
+	CPacker Buffer;
+	Buffer.Reset();
+	Buffer.AddInt(ClientID1);
+	Buffer.AddInt(ClientID2);
+
+	WriteExtra(UUID_TEEHISTORIAN_PLAYER_SWITCH, Buffer.Data(), Buffer.Size());
+}
+
 void CTeeHistorian::RecordTeamSaveSuccess(int Team, CUuid SaveID, const char *pTeamSave)
 {
+	EnsureTickWritten();
+
 	CPacker Buffer;
 	Buffer.Reset();
 	Buffer.AddInt(Team);
@@ -509,6 +610,8 @@ void CTeeHistorian::RecordTeamSaveSuccess(int Team, CUuid SaveID, const char *pT
 
 void CTeeHistorian::RecordTeamSaveFailure(int Team)
 {
+	EnsureTickWritten();
+
 	CPacker Buffer;
 	Buffer.Reset();
 	Buffer.AddInt(Team);
@@ -523,6 +626,8 @@ void CTeeHistorian::RecordTeamSaveFailure(int Team)
 
 void CTeeHistorian::RecordTeamLoadSuccess(int Team, CUuid SaveID, const char *pTeamSave)
 {
+	EnsureTickWritten();
+
 	CPacker Buffer;
 	Buffer.Reset();
 	Buffer.AddInt(Team);
@@ -541,6 +646,8 @@ void CTeeHistorian::RecordTeamLoadSuccess(int Team, CUuid SaveID, const char *pT
 
 void CTeeHistorian::RecordTeamLoadFailure(int Team)
 {
+	EnsureTickWritten();
+
 	CPacker Buffer;
 	Buffer.Reset();
 	Buffer.AddInt(Team);

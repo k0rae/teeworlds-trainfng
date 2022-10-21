@@ -2,8 +2,20 @@
 #originally created by:
 #	SiuFu
 #modified by:
-# 2020.8.19 TsFreddie
-# 2020.8.20 Dan_cao
+# 2020-08-19 TsFreddie
+# 2020-08-20 Dan_cao
+# 2020-11-12 TsFreddie
+# 2021-06-01 TsFreddie
+# 2021-11-19 cheeser0613
+# 2021-12-21 cheeser0613
+# 2022-02-07 cheeser0613
+# 2022-03-19 cheeser0613
+# 2022-03-22 cheeser0613
+# 2022-03-24 cheeser0613
+# 2022-05-14 cheeser0613
+# 2022-06-16 cheeser0613
+# 2022-06-27 cheeser0613
+# 2022-08-08 cheeser0613
 ##### /authors #####
 
 ##### translated strings #####
@@ -86,9 +98,6 @@ Client
 Close
 == 關閉
 
-Compatible version
-== 相容的版本
-
 Connect
 == 連線
 
@@ -146,14 +155,11 @@ Dynamic Camera
 Emoticon
 == 表情
 
-Enter
-== 確定
-
 Error
 == 錯誤
 
 Error loading demo
-== 回放讀取錯誤
+== 回放載入錯誤
 
 Favorite
 == 收藏
@@ -183,7 +189,7 @@ Friends
 == 好友
 
 Fullscreen
-== 全螢幕
+== 獨占全螢幕
 
 Game
 == 遊戲
@@ -207,7 +213,7 @@ General
 == 常規
 
 Graphics
-== 影象
+== 顯示
 
 Grenade
 == 榴彈槍
@@ -250,12 +256,6 @@ MOTD
 
 Map
 == 地圖
-
-Maximum ping:
-== 最高延遲：
-
-Mouse sens.
-== 滑鼠靈敏度
 
 Move left
 == 向左移動
@@ -309,7 +309,7 @@ No password
 == 沒有密碼
 
 No servers found
-== 找不到任何伺服器
+== 未檢測到任何伺服器
 
 No servers match your filter criteria
 == 沒有伺服器滿足設定的過濾條件
@@ -355,7 +355,7 @@ Player options
 == 玩家選項
 
 Players
-== 玩家數
+== 玩家
 
 Please balance teams!
 == 隊伍人數不平衡！
@@ -377,9 +377,6 @@ Red team wins!
 
 Refresh
 == 重新整理
-
-Refreshing master servers
-== 正在重新整理主伺服器
 
 Remote console
 == 遠端控制檯
@@ -447,9 +444,6 @@ Show name plates
 Show only chat messages from friends
 == 只顯示好友訊息
 
-Show only supported
-== 只顯示支援的解析度
-
 Skins
 == 外觀
 
@@ -494,9 +488,6 @@ Show clan above name plates
 
 Clan plates size
 == 戰隊名稱大小
-
-Reset wanted weapon on death
-== 死亡後自動切換回預設武器
 
 Team
 == 隊伍
@@ -569,9 +560,6 @@ Yes
 
 You must restart the game for all settings to take effect.
 == 你需要重啟遊戲來使某些設定生效。
-
-Borderless window
-== 無邊框視窗
 
 Demo
 == 回放
@@ -666,9 +654,6 @@ Round
 Lht.
 == 亮度
 
-Show console window
-== 顯示控制檯視窗
-
 Automatically take statboard screenshot
 == 自動對統計板截圖
 
@@ -693,14 +678,8 @@ Type:
 Use DDRace Scoreboard
 == 使用 DDRace 計分板
 
-Show client IDs in Scoreboard
-== 在計分板上顯示客戶端ID
-
 Show score
 == 顯示比分
-
-Show health + ammo
-== 顯示生命與彈藥
 
 Show names in chat in team colors
 == 以隊伍顏色顯示玩家暱稱
@@ -720,29 +699,14 @@ System message
 Highlighted message
 == 被提及訊息
 
-Look out!
-== 小心!
-
 Team message
 == 隊伍訊息
-
-We will win
-== 我們贏定了
 
 Normal message
 == 普通訊息
 
-Hello and welcome
-== 你好,歡迎
-
 Friend message
 == 好友訊息
-
-Inner color
-== 內部顏色
-
-Outline color
-== 外部顏色
 
 Save the best demo of each race
 == 儲存競速模式最高記錄的回放
@@ -786,20 +750,14 @@ Show other players' hook collision lines
 Show other players' key presses
 == 顯示其他玩家的按鍵
 
-Background (regular)
-== 背景(常規)
-
-Background (entities)
-== 背景(實體)
-
 Show tiles layers from BG map
-== 在背景地圖顯示圖塊層
+== 顯示實體層背景地圖的圖塊層
 
 Try fast HTTP map download first
-== 優先嚐試用HTTP高速下載地圖
+== 優先嘗試用HTTP高速下載地圖
 
 DDNet %s is available:
-== DDnet %s 現已可用：
+== DDNet %s 現已可用：
 
 Update now
 == 現在更新
@@ -825,14 +783,8 @@ Browser
 Connecting dummy
 == 正在連線分身
 
-Spectator
-== 旁觀者
-
 Search
 == 搜尋
-
-UI mouse s.
-== 主頁面靈敏度
 
 Vanilla skins only
 == 只顯示原生外觀
@@ -860,23 +812,14 @@ Grabs
 DDNet
 == DDNet
 
-second
-== 秒
-
 Select a name
 == 另存為
-
-Hi o/
-== 你好
 
 Deaths
 == 死亡數
 
 Please use a different name
 == 請換一個不同的檔名
-
-Wait before try for
-== 請等待
 
 Restart
 == 重新開始
@@ -903,7 +846,7 @@ Frags
 == 擊殺數
 
 Enable long pain sound (used when shooting in freeze)
-== 啟用長時間痛苦的聲音(在凍結時使用)
+== 啟用在凍結時的呼救聲
 
 %.2f MiB
 == %.2f MiB
@@ -912,7 +855,7 @@ Refresh Rate
 == 重新整理率
 
 New random timeout code
-== 新隨機超時程式碼
+== 隨機生成新的超時還原碼
 
 Suicides
 == 自殺數
@@ -933,9 +876,6 @@ Spree
 Max CSVs
 == 最大csv檔案數
 
-seconds
-== 秒
-
 %.2f KiB
 == %.2f KiB
 
@@ -944,9 +884,6 @@ Best
 
 Exclude
 == 排除
-
-Friend
-== 好友
 
 may cause delay
 == 可能會產生延遲
@@ -960,17 +897,8 @@ Deactivate
 Welcome to DDNet
 == 歡迎來到 DDNet
 
-Preinit VBO (iGPUs only)
-== 預初始化頂點緩衝物件 (僅限整合顯示卡)
-
 Activate
 == 啟用
-
-Multiple texture units (disable for MacOS)
-== 多重紋理單元 (MacOS不可用)
-
-Use OpenGL 3.3 (experimental)
-== 使用 OpenGL 3.3 (實驗性)
 
 File already exists, do you want to overwrite it?
 == 檔案已存在，是否覆蓋？
@@ -1009,7 +937,7 @@ Downloading %s:
 == 正在下載 %s:
 
 %d new mentions
-== %d 條新提示
+== %d 條新提及
 
 Toggle dummy
 == 切換分身
@@ -1039,7 +967,7 @@ Zoom in
 == 視距放大
 
 1 new mention
-== 1 條新提示
+== 1 條新提及
 
 Update failed! Check log...
 == 更新失敗！請檢查日誌...
@@ -1069,7 +997,7 @@ Dummy copy
 == 分身同步動作
 
 9+ new mentions
-== 9+ 條新提示
+== 9+ 條新提及
 
 Statboard
 == 統計板
@@ -1107,22 +1035,10 @@ Toggle dyncam
 DDraceNetwork is a cooperative online game where the goal is for you and your group of tees to reach the finish line of the map. As a newcomer you should start on Novice servers, which host the easiest maps. Consider the ping to choose a server close to you.
 == DDraceNetwork 是以到達地圖終點為目標，單人或組隊的線上合作遊戲。如果你是新手，你可以從有入門級地圖的 Novice 伺服器開 始。記得選擇 Ping 值低的伺服器。
 
-The maps contain freeze, which temporarily make a tee unable to move. You have to work together to get through these parts.
-== 地圖中的冰凍可以使 tee 暫時無法移動。你需要合作來透過這些關卡。
-
-The mouse wheel changes weapons. Hammer (left mouse) can be used to hit other tees and wake them up from being frozen.
-== 滑鼠滾輪可以切換武器。錘子 (滑鼠左鍵) 擊中其他 tee 時，可以讓他們從冰凍中甦醒。
-
-Hook (right mouse) can be used to swing through the map and to hook other tees to you.
-== 鉤索 (滑鼠右鍵) 可以用來悠盪您的角色來透過地圖關卡，也可以用來將其他 tee 拉向自己。
-
-Most importantly communication is key: There is no tutorial so you'll have to chat (t key) with other players to learn the basics and tricks of the game.
-== 遊戲內沒有教程，溝通則至關重要。你需要透過聊天 (t鍵) 向其他玩家學習基本技巧。
-
 It's recommended that you check the settings to adjust them to your liking before joining a server.
-== 推薦在進入伺服器前，先將設定調整到符合你的習慣。
+== 推薦在加入伺服器前，先將設定調整到符合你的習慣。
 
-Please enter your nick name below.
+Please enter your nickname below.
 == 請輸入你的暱稱。
 
 Render
@@ -1132,7 +1048,7 @@ Server best:
 == 伺服器最佳
 
 Learn
-== 學習
+== 教程Wiki
 
 Use high DPI
 == 使用高 DPI
@@ -1167,111 +1083,494 @@ Use k key to kill (restart), q to pause and watch other players. See settings fo
 Country / Region
 == 國家/地區
 
-Manual %3d:%02d  
-== 手動 %3d:%02d  
-
-Race %3d:%02d  
-== 競速賽 %3d:%02d  
-
-Auto %3d:%02d  
-== 自動 %3d:%02d  
-
-Replay %3d:%02d  
-== 回放 %3d:%02d  
-
 https://wiki.ddnet.tw/
 == https://docs.qq.com/doc/DWGFrV0xPRmVWVkla
 
-Downloading ddnet-info.json failed
-== 
-
-Saving ddnet-settings.cfg failed
-== 
-
-The width or height of texture %s is not divisible by 16, which might cause visual bugs.
-== 
-
 Warning
-== 
+== 警告
 
 Speed
-== 
-
-Theme
-== 
-
-%d of %d servers
-== 
-
-%d of %d server
-== 
-
-%d players
-== 
-
-%d player
-== 
-
-File
-== 
-
-Demos directory
-== 
+== 速度
 
 Skip the main menu
-== 
-
-Themes directory
-== 
-
-Download skins
-== 
-
-Skin Database
-== 
-
-Skins directory
-== 
-
-Background music volume
-== 
-
-Assets
-== 
-
-Use current map as background
-== 
-
-Entities
-== 
-
-Emoticons
-== 
-
-Particles
-== 
-
-Assets directory
-== 
+== 跳過主選單
 
 Website
-== 
+== 網站
 
 Settings
-== 
-
-Stop server
-== 
-
-Run server
-== 
-
-Server executable not found, can't run server
-== 
-
-Editor
-== 
+== 設定
 
 [Start menu]
 Play
-== 
+== 開始遊戲
+
+Stop server
+== 停止伺服器
+
+Run server
+== 開啟伺服器
+
+Server executable not found, can't run server
+== 未檢測到伺服器的可執行檔案，無法開啟
+
+Editor
+== 編輯器
+
+Manual
+== 手動
+
+Race
+== 競速
+
+Auto
+== 自動
+
+Replay
+== 回放
+
+Saving ddnet-settings.cfg failed
+== 配置檔案 ddnet-settings.cfg 儲存失敗
+
+Debug mode enabled. Press Ctrl+Shift+D to disable debug mode.
+== 偵錯模式已啟用。按 Ctrl+Shift+D 禁用偵錯模式。
+
+Existing Player
+== 玩家已存在
+
+Your nickname '%s' is already used (%d points). Do you still want to use it?
+== 你使用的暱稱"%s"在DDNet中有%d分的記錄，這可能代表這個暱稱已經被其他人使用過。確認要使用這個名字嗎？
+
+Checking for existing player with your name
+== 正在查詢該暱稱的DDNet記錄
+
+Theme
+== 主題
+
+%d of %d servers
+== 符合條件 %d / 總共 %d 個伺服器
+
+%d of %d server
+== 符合條件 %d / 總共 %d 個伺服器
+
+%d players
+== %d 在線玩家
+
+%d player
+== %d 在線玩家
+
+Demos directory
+== 回放目錄
+
+Smooth Dynamic Camera
+== 動態視距平滑化
+
+Themes directory
+== 主題目錄
+
+Download skins
+== 下載官方外觀
+
+Skin Database
+== 外觀數據庫
+
+Skins directory
+== 外觀目錄
+
+Game sound volume
+== 遊戲音效音量
+
+Chat sound volume
+== 聊天提示音量
+
+Background music volume
+== 背景音樂音量
+
+Assets
+== 材質
+
+Use old chat style
+== 原始聊天框
+
+Use current map as background
+== 使用當前地圖作爲實體層背景地圖
+
+Entities
+== 實體層
+
+Emoticons
+== 表情
+
+Particles
+== 粒子
+
+Assets directory
+== 材質目錄
+
+The width of texture %s is not divisible by %d, or the height is not divisible by %d, which might cause visual bugs.
+== 紋理 %s 的寬度無法被 %d 整除，或者高度無法被 %d 整除，這可能會導致視覺錯誤。
+
+AFR
+== 非洲
+
+ASI
+== 亞洲
+
+AUS
+== 澳洲
+
+EUR
+== 歐洲
+
+NA
+== 北美
+
+SA
+== 南美
+
+CHN
+== 中國
+
+Getting server list from master server
+== 正在從主伺服器獲取伺服器列表
+
+Leak IP
+== 洩露IP
+
+Chat command
+== 聊天框指令
+
+Dummy
+== 分身
+
+Windowed
+== 視窗化
+
+Windowed borderless
+== 無邊框視窗
+
+Desktop fullscreen
+== 無邊框全螢幕
+
+Laser Outline Color
+== 鐳射線邊框顏色
+
+Laser Inner Color
+== 鐳射線顏色
+
+Preview
+== 預覽
+
+Background
+== 背景
+
+Entities Background color
+== 實體層背景顏色
+
+Regular Background Color
+== 背景層背景顏色
+
+Discord
+== Discord
+
+https://ddnet.tw/discord
+== https://ddnet.tw/discord
+
+Are you sure that you want to disconnect and switch to a different server?
+== 您確定要中斷此伺服器并嘗試加入其他伺服器嗎？
+
+Refreshing...
+== 正在重整...
+
+Kill Messages
+== 擊殺訊息
+
+Show local player's key presses
+== 顯示周圍玩家的按鍵輸入
+
+Settings file
+== 設定檔案
+
+Config directory
+== 配置目錄 (cfg)
+
+Run on join
+== 加入時執行
+
+Chat command (e.g. showall 1)
+== 聊天指令 (例如: showall 1)
+
+Windowed fullscreen
+== 視窗化全螢幕
+
+The format of texture %s is not RGBA which will cause visual bugs.
+== 紋理文件 %s 并非 RGBA 格式，這可能會導致顯示錯誤
+
+Join Tutorial Server
+== 加入教學伺服器
+
+Skip Tutorial
+== 跳過教學
+
+Renderer
+== 渲染設定
+
+default
+== 預設
+
+custom
+== 自定義
+
+Graphics cards
+== 顯示卡
+
+auto
+== 自動
+
+Tutorial
+== 教學
+
+Toggle to edit your dummy settings
+== 編輯分身設定
+
+Choose default eyes when joining a server
+== 加入伺服器時的預設表情
+
+Allows maps to render with more detail
+== 允許地圖渲染更多細節
+
+When you cross the start line, show a ghost tee replicating the movements of your best time
+== 當越過起跑綫時，游戲裏將有影子回放你的最佳成績
+
+Opacity
+== 不透明度
+
+Adjust the opacity of entities belonging to other teams, such as tees and nameplates
+== 調整單人區域或其他隊伍中玩家的不透明度
+
+Quads are used for background decoration
+== 顯示用於背景裝飾的貼圖
+
+Tries to predict other entities to give a feel of low latency
+== 嘗試預測其他實體物以帶來低延遲的游玩體驗
+
+Can't find a Tutorial server
+== 無法找到教學伺服器
+
+Super
+== 無敵
+
+Team %d
+== 隊伍 %d
+
+Position:
+== 坐標	
+
+Speed:
+== 速度
+
+Angle:
+== 角度
+
+Trying to determine UDP connectivity...
+== 正在嘗試檢測 UDP 連接...
+
+UDP seems to be filtered.
+== UDP 疑似被過濾
+
+UDP and TCP IP addresses seem to be different. Try disabling VPN, proxy or network accelerators.
+== UDP 與 TCP 的 IP 地址并不相同。請嘗試屏蔽 VPN 、代理網路以及網路加速器。
+
+No answer from server yet.
+== 伺服器無響應
+
+Download community skins
+== 下載社區外觀
+
+Enable controller
+== 啓用控制器
+
+Controller %d: %s
+== 控制器 %d: %s
+
+Click to cycle through all available controllers.
+== 點擊以切換其他控制器
+
+[Ingame controller mode]
+Relative
+== 相對
+
+[Ingame controller mode]
+Absolute
+== 絕對
+
+Ingame controller mode
+== 游戲内控制器瞄準模式
+
+Ingame controller sens.
+== 搖桿靈敏度（游戲）
+
+UI controller sens.
+== 搖桿靈敏度（界面）
+
+Controller jitter tolerance
+== 搖桿錯位容錯
+
+No controller found. Plug in a controller and restart the game.
+== 未檢測到任何控制器。請重試重新連接控制器並重啓游戲。
+
+Device
+== 輸入設備
+
+Status
+== 狀態
+
+Aim bind
+== 操作軸綁定
+
+Controller Axis #%d
+== 搖桿 #%d
+
+Mouse
+== 滑鼠
+
+Ingame mouse sens.
+== 滑鼠靈敏度（游戲）
+
+UI mouse sens.
+== 滑鼠靈敏度（界面）
+
+Controller
+== 控制器
+
+Show dummy actions
+== 顯示分身狀態
+
+Show freeze bars
+== 顯示解凍進度條
+
+Show player position
+== 顯示玩家坐標
+
+Show player speed
+== 顯示玩家速度
+
+Show player target angle
+== 顯示玩家瞄準角度
+
+Opacity of freeze bars inside freeze
+== 解凍進度條不透明度
+
+Normal Color
+== 非相關訊息顔色
+
+Highlight Color
+== 相關訊息顔色
+
+Extras
+== 其他
+
+Preparing demo playback
+== 正在準備回放
+
+Connected
+== 連接成功
+
+Loading map file from storage
+== 正在從硬盤中加載地圖檔案
+
+Why are you slowmo replaying to read this?
+== 所以你爲什麽要慢速回放來看這個
+
+Initializing components
+== 正在初始化游戲引擎
+
+Initializing assets
+== 正在初始化材質
+
+Initializing map logic
+== 正在初始化地圖邏輯
+
+Sending initial client info
+== 正在發送初始客戶端資訊
+
+Uploading map data to GPU
+== 正在將地圖數據傳輸至顯卡
+
+Getting game info
+== 正在獲取游戲資訊
+
+Requesting to join the game
+== 正在請求加入游戲
+
+Loading menu images
+== 正在加載主菜單圖片
+
+Loading demo files
+== 正在加載回放檔案
+
+Loading ghost files
+== 正在加載影子檔案
+
+Loading skin files
+== 正在加載外觀檔案
+
+Appearance
+== 游戲界面
+
+Name Plate
+== 匿稱板塊
+
+Hook Collisions
+== 瞄準輔助
+
+Show health, shields and ammo
+== 顯示生命、護甲與彈藥欄
+
+DDRace HUD
+== DDRace HUD
+
+Show client IDs in scoreboard
+== 顯示客戶端 IDs （計分板中）
+
+Show DDRace HUD
+== 顯示 DDRace HUD
+
+Show jumps indicator
+== 顯示跳躍次數
+
+Show hook strength indicator
+== 顯示對其他玩家的鈎索强度
+
+Hook collision line
+== 瞄準輔助綫
+
+Hook collision line width
+== 輔助綫寬度
+
+Hook collision line opacity
+== 輔助綫不透明度
+
+Colors of the hook collision line, in case of a possible collision with:
+== 輔助綫顔色（當瞄準以下實體物時）：
+
+Your movements are not taken into account when calculating the line colors
+== 移動所造成的瞄準偏移將不計入考量
+
+Nothing hookable
+== 未瞄準任何實體物
+
+Something hookable
+== 可鈎索的方塊
+
+A Tee
+== 其他玩家
+
+Loading assets
+== 正在加載材質
+
+Loading race demo files
+== 正在加載回放檔案
+
+Loading sound files
+== 正在加載聲音檔案

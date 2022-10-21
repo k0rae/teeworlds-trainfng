@@ -5,6 +5,11 @@
 
 #include <game/client/component.h>
 #include <game/client/components/menus.h>
+#include <game/generated/protocol.h>
+
+#include <game/client/render.h>
+
+struct CNetObj_Character;
 
 enum
 {
@@ -60,7 +65,7 @@ private:
 		int m_ChunkSize;
 		int m_NumItems;
 
-		std::vector<CGhostCharacter *> m_lChunks;
+		std::vector<CGhostCharacter *> m_vpChunks;
 
 	public:
 		CGhostPath() { Reset(); }
@@ -68,8 +73,8 @@ private:
 		CGhostPath(const CGhostPath &Other) = delete;
 		CGhostPath &operator=(const CGhostPath &Other) = delete;
 
-		CGhostPath(CGhostPath &&Other);
-		CGhostPath &operator=(CGhostPath &&Other);
+		CGhostPath(CGhostPath &&Other) noexcept;
+		CGhostPath &operator=(CGhostPath &&Other) noexcept;
 
 		void Reset(int ChunkSize = 25 * 60); // one minute with default snap rate
 		void SetSize(int Items);
@@ -120,12 +125,12 @@ private:
 	bool m_RenderingStartedByServer;
 
 	static void GetGhostSkin(CGhostSkin *pSkin, const char *pSkinName, int UseCustomColor, int ColorBody, int ColorFeet);
-	static void GetGhostCharacter(CGhostCharacter *pGhostChar, const CNetObj_Character *pChar);
+	static void GetGhostCharacter(CGhostCharacter *pGhostChar, const CNetObj_Character *pChar, const CNetObj_DDNetCharacter *pDDnetChar);
 	static void GetNetObjCharacter(CNetObj_Character *pChar, const CGhostCharacter *pGhostChar);
 
 	void GetPath(char *pBuf, int Size, const char *pPlayerName, int Time = -1) const;
 
-	void AddInfos(const CNetObj_Character *pChar);
+	void AddInfos(const CNetObj_Character *pChar, const CNetObj_DDNetCharacter *pDDnetChar);
 	int GetSlot() const;
 
 	void CheckStart();
@@ -145,12 +150,14 @@ public:
 	bool m_AllowRestart;
 
 	CGhost();
+	virtual int Sizeof() const override { return sizeof(*this); }
 
-	virtual void OnRender();
-	virtual void OnConsoleInit();
-	virtual void OnReset();
-	virtual void OnMessage(int MsgType, void *pRawMsg);
-	virtual void OnMapLoad();
+	virtual void OnRender() override;
+	virtual void OnConsoleInit() override;
+	virtual void OnReset() override;
+	virtual void OnMessage(int MsgType, void *pRawMsg) override;
+	virtual void OnMapLoad() override;
+	virtual void OnShutdown() override;
 
 	void OnNewSnapshot();
 	void OnNewPredictedSnapshot();

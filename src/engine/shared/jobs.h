@@ -8,12 +8,11 @@
 #include <atomic>
 #include <memory>
 
-class IJob;
 class CJobPool;
 
 class IJob
 {
-	friend class CJobPool;
+	friend CJobPool;
 
 private:
 	std::shared_ptr<IJob> m_pNext;
@@ -48,16 +47,18 @@ class CJobPool
 
 	LOCK m_Lock;
 	SEMAPHORE m_Semaphore;
-	std::shared_ptr<IJob> m_pFirstJob;
-	std::shared_ptr<IJob> m_pLastJob;
+	std::shared_ptr<IJob> m_pFirstJob GUARDED_BY(m_Lock);
+	std::shared_ptr<IJob> m_pLastJob GUARDED_BY(m_Lock);
 
-	static void WorkerThread(void *pUser);
+	static void WorkerThread(void *pUser) NO_THREAD_SAFETY_ANALYSIS;
 
 public:
 	CJobPool();
 	~CJobPool();
 
 	void Init(int NumThreads);
-	void Add(std::shared_ptr<IJob> pJob);
+	void Destroy();
+	void Add(std::shared_ptr<IJob> pJob) REQUIRES(!m_Lock);
+	static void RunBlocking(IJob *pJob);
 };
 #endif

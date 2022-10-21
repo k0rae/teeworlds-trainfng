@@ -1,61 +1,75 @@
-def get_msgs():
-    from datatypes import NetMessage
-    import network
+import sys
+import network
+import seven.network
 
-    return ["NETMSG_INVALID"] + [m.enum_name for m in network.Messages]
+def get_msgs():
+	return ["NETMSG_INVALID"] + [m.enum_name for m in network.Messages]
 
 def get_msgs_7():
-    from seven.datatypes import NetMessage
-    import seven.network as network
-
-    return ["NETMSG_INVALID"] + [m.enum_name for m in network.Messages]
+	return ["NETMSG_INVALID"] + [m.enum_name for m in seven.network.Messages]
 
 def get_objs():
-    from datatypes import NetObject
-    import network
-
-    return ["NETOBJ_INVALID"] + [m.enum_name for m in network.Objects if m.ex is None]
+	return ["NETOBJ_INVALID"] + [m.enum_name for m in network.Objects if m.ex is None]
 
 def get_objs_7():
-    from seven.datatypes import NetObject
-    import seven.network as network
-
-    return ["NETOBJ_INVALID"] + [m.enum_name for m in network.Objects]
+	return ["NETOBJ_INVALID"] + [m.enum_name for m in seven.network.Objects]
 
 def generate_map(a, b):
-    map = []
-    for i, m in enumerate(a):
-        try:
-            map += [b.index(m)]
-        except ValueError:
-            map += [-1]
+	result = []
+	for m in a:
+		try:
+			result += [b.index(m)]
+		except ValueError:
+			result += [-1]
 
-    return map
+	return result
 
+def output_map_header(name, m):
+	print(f"extern const int gs_{name}[{len(m)}];")
+	print(f"inline int {name}(int a) {{ if(a < 0 || a >= {len(m)}) return -1; return gs_{name}[a]; }}")
 
-def output_map(name, map):
-    print("static const int gs_{}[{}] = {{".format(name, len(map)))
-    print(*map, sep=',')
-    print("};")
-    print("inline int {0}(int a) {{ if(a < 0 || a >= {1}) return -1; return gs_{0}[a]; }}".format(name, len(map)))
+def output_map_source(name, m):
+	print(f"const int gs_{name}[{len(m)}] = {{")
+	print(*m, sep=',')
+	print("};")
 
 def main():
-    guard = "GAME_GENERATED_PROTOCOLGLUE"
-    print("#ifndef " + guard)
-    print("#define " + guard)
+	map_header = "map_header" in sys.argv
+	map_source = "map_source" in sys.argv
+	guard = "GAME_GENERATED_PROTOCOLGLUE"
+	if map_header:
+		print("#ifndef " + guard)
+		print("#define " + guard)
+	elif map_source:
+		print("#include \"protocolglue.h\"")
 
-    msgs = get_msgs()
-    msgs7 = get_msgs_7()
+	msgs = get_msgs()
+	msgs7 = get_msgs_7()
 
-    output_map("Msg_SixToSeven", generate_map(msgs, msgs7))
-    output_map("Msg_SevenToSix", generate_map(msgs7, msgs))
+	map6to7 = generate_map(msgs, msgs7)
+	map7to6 = generate_map(msgs7, msgs)
 
-    objs = get_objs()
-    objs7 = get_objs_7()
-    output_map("Obj_SixToSeven", generate_map(objs, objs7))
-    output_map("Obj_SevenToSix", generate_map(objs7, objs))
+	if map_header:
+		output_map_header("Msg_SixToSeven", map6to7)
+		output_map_header("Msg_SevenToSix", map7to6)
+	elif map_source:
+		output_map_source("Msg_SixToSeven", map6to7)
+		output_map_source("Msg_SevenToSix", map7to6)
 
-    print("#endif //" + guard)
+	objs = get_objs()
+	objs7 = get_objs_7()
+
+	objs6to7 = generate_map(objs, objs7)
+	objs7to6 = generate_map(objs7, objs)
+
+	if map_header:
+		output_map_header("Obj_SixToSeven", objs6to7)
+		output_map_header("Obj_SevenToSix", objs7to6)
+		print("#endif //" + guard)
+	elif map_source:
+		output_map_source("Obj_SixToSeven", objs6to7)
+		output_map_source("Obj_SevenToSix", objs7to6)
+
 
 if __name__ == "__main__":
-    main()
+	main()

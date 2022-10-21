@@ -4,6 +4,7 @@
 #modified by:
 #	MertenNor		2011-07-02 08:46:16
 #	nuborn			2020-08-31 23:00:00
+#	nuborn			2020-11-12 00:00:00
 ##### /authors #####
 
 ##### translated strings #####
@@ -86,9 +87,6 @@ Client
 Close
 == Lukk
 
-Compatible version
-== Kompitabel versjon
-
 Connect
 == Koble til
 
@@ -145,9 +143,6 @@ Dynamic Camera
 
 Emoticon
 == Uttrykksikoner
-
-Enter
-== Enter
 
 Error
 == Feil
@@ -244,12 +239,6 @@ MOTD
 
 Map
 == Bane
-
-Maximum ping:
-== Maks ping:
-
-Mouse sens.
-== Mushastighet
 
 Move left
 == Gå til venstre
@@ -348,9 +337,6 @@ Red team wins!
 Refresh
 == Oppdater
 
-Refreshing master servers
-== Opdaterer master-servere
-
 Remote console
 == Server-konsoll
 
@@ -413,9 +399,6 @@ Show ingame HUD
 
 Show name plates
 == Vis navneskilt
-
-Show only supported
-== Vis kompatible
 
 Skins
 == Utseender
@@ -677,22 +660,10 @@ Welcome to DDNet
 DDraceNetwork is a cooperative online game where the goal is for you and your group of tees to reach the finish line of the map. As a newcomer you should start on Novice servers, which host the easiest maps. Consider the ping to choose a server close to you.
 == DDraceNetwork er et kooperativt onlinespill der målet er at du og gruppen din skal nå banens målstrek. Som nybegynner anbefales det at du starter på Novice-serverne, som har de letteste banene. Se på serverens ping for å finne en som er nærme deg.
 
-The maps contain freeze, which temporarily make a tee unable to move. You have to work together to get through these parts.
-== Banene inneholder freeze, som midlertidig gjør at en tee ikke kan bevege seg. Du må samarbeide med andre for å komme gjennom disse partiene.
-
-The mouse wheel changes weapons. Hammer (left mouse) can be used to hit other tees and wake them up from being frozen.
-== Scrollehjulet bytter våpen. Hammer (venstre museknapp) kan brukes til å slå andre tees og vekke dem opp fra freeze.
-
-Hook (right mouse) can be used to swing through the map and to hook other tees to you.
-== Gripekrok (høyre museknapp) kan brukes til å svinge seg gjennom banen og til å dra andre spillere mot deg.
-
-Most importantly communication is key: There is no tutorial so you'll have to chat (t key) with other players to learn the basics and tricks of the game.
-== Viktigst av alt er kommunikasjon: Det fins ingen tutorial, så du er nødt til å snakke (t-knappen) med andre spillere for å lære det grunnleggende og triksene i spillet.
-
 It's recommended that you check the settings to adjust them to your liking before joining a server.
 == Det anbefales å sjekke innstillingene og justere dem slik det passer deg før du går inn på en server.
 
-Please enter your nick name below.
+Please enter your nickname below.
 == Skriv inn ditt ønskede kallenavn under.
 
 Destination file already exist
@@ -803,9 +774,6 @@ Save
 Switch weapon when out of ammo
 == Bytt våpen ved tom ammo
 
-Reset wanted weapon on death
-== Tilbakestill våpen ved død
-
 Show only chat messages from friends
 == Vis kun meldinger fra venner
 
@@ -817,9 +785,6 @@ Clan plates size
 
 Refresh Rate
 == Oppdateringsrate
-
-Show console window
-== Vis konsoll-vindu
 
 Automatically take statboard screenshot
 == Automatisk ta skjermbilde av spillerstatistikk
@@ -896,26 +861,11 @@ Show entities
 Show HUD
 == Vis HUD
 
-UI mouse s.
-== UI museh.
-
-Borderless window
-== Rammeløst vindu
-
 may cause delay
 == kan gi forsinkelse
 
 Screen
 == Skjerm
-
-Use OpenGL 3.3 (experimental)
-== Bruk OpenGL 3.3 (eksperimentell)
-
-Preinit VBO (iGPUs only)
-== Preinit. VBO (kun iGPU)
-
-Multiple texture units (disable for MacOS)
-== Multiple texture units (slå av for MacOS)
 
 Use high DPI
 == Bruk høy DPI
@@ -959,14 +909,8 @@ DDNet Client needs to be restarted to complete update!
 Use DDRace Scoreboard
 == Bruk DDRace-poengliste
 
-Show client IDs in Scoreboard
-== Vis klient-ID i poengliste
-
 Show score
 == Vis poeng
-
-Show health + ammo
-== Vis liv + ammo
 
 Show names in chat in team colors
 == Vis lagfarger på navn i chat
@@ -989,47 +933,14 @@ Reset
 Highlighted message
 == Uthevet melding
 
-Spectator
-== Tilskuer
-
-Look out!
-== Se opp!
-
 Team message
 == Lagmelding
-
-We will win
-== Vi kommer til å vinne
 
 Friend message
 == Vennemelding
 
-Friend
-== Venn
-
-Hi o/
-== Hei o/
-
 Normal message
 == Vanlig melding
-
-Hello and welcome
-== Hei og velkommen
-
-Inner color
-== Indre farge
-
-Outline color
-== Kantfarge
-
-Wait before try for
-== Vent før nytt forsøk i
-
-second
-== sekund
-
-seconds
-== sekunder
 
 Save the best demo of each race
 == Lagre beste demo for hvert løp
@@ -1085,12 +996,6 @@ Show other players' key presses
 Old mouse mode
 == Gammel musemodus
 
-Background (regular)
-== Bakgrunn (vanlig)
-
-Background (entities)
-== Bakgrunn (entities)
-
 Show tiles layers from BG map
 == Vis tile-lag fra BG-bane
 
@@ -1114,18 +1019,6 @@ New random timeout code
 
 Time
 == Tid
-
-Manual %3d:%02d  
-== Manuell %3d:%02d
-
-Race %3d:%02d  
-== Løp %3d:%02d
-
-Auto %3d:%02d  
-== Auto %3d:%02d
-
-Replay %3d:%02d  
-== Opptak %3d:%02d
 
 Follow
 == Følg
@@ -1166,108 +1059,503 @@ Grabs
 9+ new mentions
 == nevnt 9+ ganger
 
-Downloading ddnet-info.json failed
-== 
+Manual
+== Manuell
+
+Race
+== Løp
+
+Auto
+== Auto
+
+Replay
+== Opptak
 
 Saving ddnet-settings.cfg failed
-== 
-
-The width or height of texture %s is not divisible by 16, which might cause visual bugs.
-== 
+== Lagring av ddnet-settings.cfg mislyktes
 
 Warning
-== 
+== Advarsel
+
+Debug mode enabled. Press Ctrl+Shift+D to disable debug mode.
+== Feilsøkemodus aktivert. Trykk Ctrl+Shift+D for å deaktivere feilsøkemodus.
 
 Use k key to kill (restart), q to pause and watch other players. See settings for other key binds.
-== 
+== Bruk k-tasten for å drepe (restarte), q for å pause og se på andre spillere. Se innstillinger for andre tasteoppsett.
+
+Existing Player
+== Eksisterende Spiller
+
+Your nickname '%s' is already used (%d points). Do you still want to use it?
+== Ditt kallenavn '%s' er allerede i bruk (%d poeng). Vil du fortsatt bruke det?
+
+Checking for existing player with your name
+== Sjekker etter eksisterende spiller med ditt navn
 
 Country / Region
-== 
+== Land / Region
 
 Speed
-== 
+== Hastighet
 
 Theme
-== 
+== Tema
 
 %d of %d servers
-== 
+== %d av %d servere
 
 %d of %d server
-== 
+== %d av %d server
 
 %d players
-== 
+== %d spillere
 
 %d player
-== 
-
-File
-== 
+== %d spiller
 
 Demos directory
-== 
+== Demomappe
+
+Smooth Dynamic Camera
+== Mykt dynamisk kamera
 
 Skip the main menu
-== 
+== Hopp over hovedmeny
 
 Themes directory
-== 
+== Temamappe
 
 Download skins
-== 
+== Last ned skins
 
 Skin Database
-== 
+== Skin-database
 
 Skins directory
-== 
+== Skinmappe
+
+Game sound volume
+== Lydvolum spill
+
+Chat sound volume
+== Lydvolum chat
 
 Background music volume
-== 
+== Bakgrunnsmusikkvolum
 
 Assets
-== 
+== Ressurser
+
+Use old chat style
+== Bruk gammel chattestil
 
 Client message
-== 
+== Klientmelding
 
 Use current map as background
-== 
+== Bruk nåværende bane som bakgrunn
 
 Entities
-== 
+== Entities
 
 Emoticons
-== 
+== Emotikoner
 
 Particles
-== 
+== Partikler
 
 Assets directory
-== 
+== Ressursmappe
 
 https://wiki.ddnet.tw/
-== 
+== https://wiki.ddnet.tw/
 
 Website
-== 
+== Webside
 
 Settings
-== 
+== Innstillinger
 
 Stop server
-== 
+== Stopp server
 
 Run server
-== 
+== Start server
 
 Server executable not found, can't run server
-== 
+== Server-programfil ikke funnet, kan ikke starte server
 
 Editor
-== 
+== Baneredigerer
 
 [Start menu]
 Play
+== Spill
+
+The width of texture %s is not divisible by %d, or the height is not divisible by %d, which might cause visual bugs.
+== 
+
+The format of texture %s is not RGBA which will cause visual bugs.
+== 
+
+Preparing demo playback
+== 
+
+Connected
+== 
+
+Loading map file from storage
+== 
+
+Why are you slowmo replaying to read this?
+== 
+
+Initializing components
+== 
+
+Initializing assets
+== 
+
+Initializing map logic
+== 
+
+Sending initial client info
+== 
+
+Position:
+== 
+
+Speed:
+== 
+
+Angle:
+== 
+
+Uploading map data to GPU
+== 
+
+Trying to determine UDP connectivity...
+== 
+
+UDP seems to be filtered.
+== 
+
+UDP and TCP IP addresses seem to be different. Try disabling VPN, proxy or network accelerators.
+== 
+
+No answer from server yet.
+== 
+
+Getting game info
+== 
+
+Requesting to join the game
+== 
+
+Are you sure that you want to disconnect and switch to a different server?
+== 
+
+Join Tutorial Server
+== 
+
+Skip Tutorial
+== 
+
+Loading menu images
+== 
+
+AFR
+== 
+
+ASI
+== 
+
+AUS
+== 
+
+EUR
+== 
+
+NA
+== 
+
+SA
+== 
+
+CHN
+== 
+
+Getting server list from master server
+== 
+
+Refreshing...
+== 
+
+Leak IP
+== 
+
+Loading demo files
+== 
+
+Loading ghost files
+== 
+
+Settings file
+== 
+
+Config directory
+== 
+
+Toggle to edit your dummy settings
+== 
+
+Download community skins
+== 
+
+Choose default eyes when joining a server
+== 
+
+Loading skin files
+== 
+
+Chat command
+== 
+
+Enable controller
+== 
+
+Controller %d: %s
+== 
+
+Click to cycle through all available controllers.
+== 
+
+[Ingame controller mode]
+Relative
+== 
+
+[Ingame controller mode]
+Absolute
+== 
+
+Ingame controller mode
+== 
+
+Ingame controller sens.
+== 
+
+UI controller sens.
+== 
+
+Controller jitter tolerance
+== 
+
+No controller found. Plug in a controller and restart the game.
+== 
+
+Device
+== 
+
+Status
+== 
+
+Aim bind
+== 
+
+Controller Axis #%d
+== 
+
+Mouse
+== 
+
+Ingame mouse sens.
+== 
+
+UI mouse sens.
+== 
+
+Controller
+== 
+
+Dummy
+== 
+
+Windowed
+== 
+
+Windowed borderless
+== 
+
+Windowed fullscreen
+== 
+
+Desktop fullscreen
+== 
+
+Allows maps to render with more detail
+== 
+
+Renderer
+== 
+
+default
+== 
+
+custom
+== 
+
+Graphics cards
+== 
+
+auto
+== 
+
+Appearance
+== 
+
+Name Plate
+== 
+
+Hook Collisions
+== 
+
+Kill Messages
+== 
+
+Show health, shields and ammo
+== 
+
+DDRace HUD
+== 
+
+Show client IDs in scoreboard
+== 
+
+Show DDRace HUD
+== 
+
+Show jumps indicator
+== 
+
+Show dummy actions
+== 
+
+Show player position
+== 
+
+Show player speed
+== 
+
+Show player target angle
+== 
+
+Show freeze bars
+== 
+
+Opacity of freeze bars inside freeze
+== 
+
+Preview
+== 
+
+Show hook strength indicator
+== 
+
+Show local player's key presses
+== 
+
+Hook collision line
+== 
+
+Hook collision line width
+== 
+
+Hook collision line opacity
+== 
+
+Colors of the hook collision line, in case of a possible collision with:
+== 
+
+Your movements are not taken into account when calculating the line colors
+== 
+
+Nothing hookable
+== 
+
+Something hookable
+== 
+
+A Tee
+== 
+
+Normal Color
+== 
+
+Highlight Color
+== 
+
+Laser Outline Color
+== 
+
+Laser Inner Color
+== 
+
+When you cross the start line, show a ghost tee replicating the movements of your best time
+== 
+
+Opacity
+== 
+
+Adjust the opacity of entities belonging to other teams, such as tees and nameplates
+== 
+
+Quads are used for background decoration
+== 
+
+Tries to predict other entities to give a feel of low latency
+== 
+
+Background
+== 
+
+Entities Background color
+== 
+
+Regular Background Color
+== 
+
+Run on join
+== 
+
+Chat command (e.g. showall 1)
+== 
+
+Extras
+== 
+
+Loading assets
+== 
+
+Discord
+== 
+
+https://ddnet.tw/discord
+== 
+
+Tutorial
+== 
+
+Can't find a Tutorial server
+== 
+
+Loading race demo files
+== 
+
+Super
+== 
+
+Team %d
+== 
+
+Loading sound files
 == 

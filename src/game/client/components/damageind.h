@@ -7,7 +7,7 @@
 
 class CDamageInd : public CComponent
 {
-	int64 m_Lastupdate;
+	int64_t m_Lastupdate;
 	struct CItem
 	{
 		vec2 m_Pos;
@@ -25,16 +25,17 @@ class CDamageInd : public CComponent
 	int m_NumItems;
 
 	CItem *CreateI();
-	void DestroyI(CItem *i);
+	void DestroyI(CItem *pItem);
 
 	int m_DmgIndQuadContainerIndex;
 
 public:
 	CDamageInd();
+	virtual int Sizeof() const override { return sizeof(*this); }
 
 	void Create(vec2 Pos, vec2 Dir);
 	void Reset();
-	virtual void OnRender();
-	virtual void OnInit();
+	virtual void OnRender() override;
+	virtual void OnInit() override;
 };
 #endif

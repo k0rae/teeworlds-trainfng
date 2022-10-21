@@ -3,7 +3,7 @@
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/textrender.h>
-#include <game/generated/client_data.h>
+
 #include <game/generated/protocol.h>
 
 #include <game/client/gameclient.h>
@@ -20,7 +20,7 @@ void CBroadcast::OnReset()
 
 void CBroadcast::OnRender()
 {
-	if(m_pClient->m_pScoreboard->Active() || m_pClient->m_pMotd->IsActive() || !g_Config.m_ClShowBroadcasts)
+	if(m_pClient->m_Scoreboard.Active() || m_pClient->m_Motd.IsActive() || !g_Config.m_ClShowBroadcasts)
 		return;
 
 	Graphics()->MapScreen(0, 0, 300 * Graphics()->ScreenAspect(), 300);
@@ -39,7 +39,7 @@ void CBroadcast::OnMessage(int MsgType, void *pRawMsg)
 	if(MsgType == NETMSGTYPE_SV_BROADCAST)
 	{
 		CNetMsg_Sv_Broadcast *pMsg = (CNetMsg_Sv_Broadcast *)pRawMsg;
-		str_copy(m_aBroadcastText, pMsg->m_pMessage, sizeof(m_aBroadcastText));
+		str_copy(m_aBroadcastText, pMsg->m_pMessage);
 		CTextCursor Cursor;
 		TextRender()->SetCursor(&Cursor, 0, 0, 12.0f, TEXTFLAG_STOP_AT_END);
 		Cursor.m_LineWidth = 300 * Graphics()->ScreenAspect();
@@ -57,7 +57,7 @@ void CBroadcast::OnMessage(int MsgType, void *pRawMsg)
 					aBuf[ii] = '\0';
 					ii = 0;
 					if(aBuf[0])
-						m_pClient->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "broadcast", aBuf, true);
+						m_pClient->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "broadcast", aBuf, color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageHighlightColor)));
 				}
 				else
 				{
@@ -67,7 +67,7 @@ void CBroadcast::OnMessage(int MsgType, void *pRawMsg)
 			}
 			aBuf[ii] = '\0';
 			if(aBuf[0])
-				m_pClient->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "broadcast", aBuf, true);
+				m_pClient->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "broadcast", aBuf, color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageHighlightColor)));
 		}
 	}
 }

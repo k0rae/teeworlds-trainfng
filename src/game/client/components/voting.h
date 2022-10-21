@@ -3,11 +3,15 @@
 #ifndef GAME_CLIENT_COMPONENTS_VOTING_H
 #define GAME_CLIENT_COMPONENTS_VOTING_H
 
+#include <base/system.h>
+
+#include <engine/console.h>
 #include <engine/shared/memheap.h>
 
 #include <game/client/component.h>
-#include <game/client/ui.h>
 #include <game/voting.h>
+
+class CUIRect;
 
 class CVoting : public CComponent
 {
@@ -16,7 +20,7 @@ class CVoting : public CComponent
 	static void ConCallvote(IConsole::IResult *pResult, void *pUserData);
 	static void ConVote(IConsole::IResult *pResult, void *pUserData);
 
-	int64 m_Closetime;
+	int64_t m_Closetime;
 	char m_aDescription[VOTE_DESC_LENGTH];
 	char m_aReason[VOTE_REASON_LENGTH];
 	int m_Voted;
@@ -35,10 +39,11 @@ public:
 	CVoteOptionClient *m_pRecycleLast;
 
 	CVoting();
-	virtual void OnReset();
-	virtual void OnConsoleInit();
-	virtual void OnMessage(int Msgtype, void *pRawMsg);
-	virtual void OnRender();
+	virtual int Sizeof() const override { return sizeof(*this); }
+	virtual void OnReset() override;
+	virtual void OnConsoleInit() override;
+	virtual void OnMessage(int Msgtype, void *pRawMsg) override;
+	virtual void OnRender() override;
 
 	void RenderBars(CUIRect Bars, bool Text);
 

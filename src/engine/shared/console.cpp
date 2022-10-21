@@ -1,18 +1,21 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
-#include <new>
 
 #include <base/color.h>
+#include <base/log.h>
 #include <base/math.h>
 #include <base/system.h>
-#include <base/vmath.h>
 
+#include <engine/client/checksum.h>
 #include <engine/shared/protocol.h>
 #include <engine/storage.h>
 
 #include "config.h"
 #include "console.h"
 #include "linereader.h"
+
+#include <iterator> // std::size
+#include <new>
 
 // todo: rework this
 
@@ -39,62 +42,62 @@ float CConsole::CResult::GetFloat(unsigned Index)
 
 ColorHSLA CConsole::CResult::GetColor(unsigned Index, bool Light)
 {
-	ColorHSLA hsl = ColorHSLA(0, 0, 0);
+	ColorHSLA Hsla = ColorHSLA(0, 0, 0);
 	if(Index >= m_NumArgs)
-		return hsl;
+		return Hsla;
 
 	const char *pStr = m_apArgs[Index];
 	if(str_isallnum(pStr) || ((pStr[0] == '-' || pStr[0] == '+') && str_isallnum(pStr + 1))) // Teeworlds Color (Packed HSL)
 	{
-		hsl = ColorHSLA(str_toulong_base(pStr, 10), true);
+		Hsla = ColorHSLA(str_toulong_base(pStr, 10), true);
 		if(Light)
-			hsl = hsl.UnclampLighting();
+			Hsla = Hsla.UnclampLighting();
 	}
 	else if(*pStr == '$') // Hex RGB
 	{
-		ColorRGBA rgb = ColorRGBA(0, 0, 0, 1);
+		ColorRGBA Rgba = ColorRGBA(0, 0, 0, 1);
 		int Len = str_length(pStr);
 		if(Len == 4)
 		{
 			unsigned Num = str_toulong_base(pStr + 1, 16);
-			rgb.r = (((Num >> 8) & 0x0F) + ((Num >> 4) & 0xF0)) / 255.0f;
-			rgb.g = (((Num >> 4) & 0x0F) + ((Num >> 0) & 0xF0)) / 255.0f;
-			rgb.b = (((Num >> 0) & 0x0F) + ((Num << 4) & 0xF0)) / 255.0f;
+			Rgba.r = (((Num >> 8) & 0x0F) + ((Num >> 4) & 0xF0)) / 255.0f;
+			Rgba.g = (((Num >> 4) & 0x0F) + ((Num >> 0) & 0xF0)) / 255.0f;
+			Rgba.b = (((Num >> 0) & 0x0F) + ((Num << 4) & 0xF0)) / 255.0f;
 		}
 		else if(Len == 7)
 		{
 			unsigned Num = str_toulong_base(pStr + 1, 16);
-			rgb.r = ((Num >> 16) & 0xFF) / 255.0f;
-			rgb.g = ((Num >> 8) & 0xFF) / 255.0f;
-			rgb.b = ((Num >> 0) & 0xFF) / 255.0f;
+			Rgba.r = ((Num >> 16) & 0xFF) / 255.0f;
+			Rgba.g = ((Num >> 8) & 0xFF) / 255.0f;
+			Rgba.b = ((Num >> 0) & 0xFF) / 255.0f;
 		}
 		else
 		{
-			return hsl;
+			return Hsla;
 		}
 
-		hsl = color_cast<ColorHSLA>(rgb);
+		Hsla = color_cast<ColorHSLA>(Rgba);
 	}
 	else if(!str_comp_nocase(pStr, "red"))
-		hsl = ColorHSLA(0.0f / 6.0f, 1, .5f);
+		Hsla = ColorHSLA(0.0f / 6.0f, 1, .5f);
 	else if(!str_comp_nocase(pStr, "yellow"))
-		hsl = ColorHSLA(1.0f / 6.0f, 1, .5f);
+		Hsla = ColorHSLA(1.0f / 6.0f, 1, .5f);
 	else if(!str_comp_nocase(pStr, "green"))
-		hsl = ColorHSLA(2.0f / 6.0f, 1, .5f);
+		Hsla = ColorHSLA(2.0f / 6.0f, 1, .5f);
 	else if(!str_comp_nocase(pStr, "cyan"))
-		hsl = ColorHSLA(3.0f / 6.0f, 1, .5f);
+		Hsla = ColorHSLA(3.0f / 6.0f, 1, .5f);
 	else if(!str_comp_nocase(pStr, "blue"))
-		hsl = ColorHSLA(4.0f / 6.0f, 1, .5f);
+		Hsla = ColorHSLA(4.0f / 6.0f, 1, .5f);
 	else if(!str_comp_nocase(pStr, "magenta"))
-		hsl = ColorHSLA(5.0f / 6.0f, 1, .5f);
+		Hsla = ColorHSLA(5.0f / 6.0f, 1, .5f);
 	else if(!str_comp_nocase(pStr, "white"))
-		hsl = ColorHSLA(0, 0, 1);
+		Hsla = ColorHSLA(0, 0, 1);
 	else if(!str_comp_nocase(pStr, "gray"))
-		hsl = ColorHSLA(0, 0, .5f);
+		Hsla = ColorHSLA(0, 0, .5f);
 	else if(!str_comp_nocase(pStr, "black"))
-		hsl = ColorHSLA(0, 0, 0);
+		Hsla = ColorHSLA(0, 0, 0);
 
-	return hsl;
+	return Hsla;
 }
 
 const IConsole::CCommandInfo *CConsole::CCommand::NextCommandInfo(int AccessLevel, int FlagMask) const
@@ -158,7 +161,7 @@ int CConsole::ParseArgs(CResult *pResult, const char *pFormat)
 
 	pStr = pResult->m_pArgsStart;
 
-	while(1)
+	while(true)
 	{
 		if(!Command)
 			break;
@@ -197,7 +200,7 @@ int CConsole::ParseArgs(CResult *pResult, const char *pFormat)
 				pResult->AddArgument(pStr);
 
 				pDst = pStr; // we might have to process escape data
-				while(1)
+				while(true)
 				{
 					if(pStr[0] == '"')
 						break;
@@ -287,23 +290,6 @@ char CConsole::NextParam(const char *&pFormat)
 	return *pFormat;
 }
 
-int CConsole::RegisterPrintCallback(int OutputLevel, FPrintCallback pfnPrintCallback, void *pUserData)
-{
-	if(m_NumPrintCB == MAX_PRINT_CB)
-		return -1;
-
-	m_aPrintCB[m_NumPrintCB].m_OutputLevel = clamp(OutputLevel, (int)(OUTPUT_LEVEL_STANDARD), (int)(OUTPUT_LEVEL_DEBUG));
-	m_aPrintCB[m_NumPrintCB].m_pfnPrintCallback = pfnPrintCallback;
-	m_aPrintCB[m_NumPrintCB].m_pPrintCallbackUserdata = pUserData;
-	return m_NumPrintCB++;
-}
-
-void CConsole::SetPrintOutputLevel(int Index, int OutputLevel)
-{
-	if(Index >= 0 && Index < MAX_PRINT_CB)
-		m_aPrintCB[Index].m_OutputLevel = clamp(OutputLevel, (int)(OUTPUT_LEVEL_STANDARD), (int)(OUTPUT_LEVEL_DEBUG));
-}
-
 char *CConsole::Format(char *pBuf, int Size, const char *pFrom, const char *pStr)
 {
 	char aTimeBuf[80];
@@ -313,17 +299,40 @@ char *CConsole::Format(char *pBuf, int Size, const char *pFrom, const char *pStr
 	return pBuf;
 }
 
-void CConsole::Print(int Level, const char *pFrom, const char *pStr, bool Highlighted)
+LEVEL IConsole::ToLogLevel(int Level)
 {
-	dbg_msg(pFrom, "%s", pStr);
-	char aBuf[1024];
-	Format(aBuf, sizeof(aBuf), pFrom, pStr);
-	for(int i = 0; i < m_NumPrintCB; ++i)
+	switch(Level)
 	{
-		if(Level <= m_aPrintCB[i].m_OutputLevel && m_aPrintCB[i].m_pfnPrintCallback)
-		{
-			m_aPrintCB[i].m_pfnPrintCallback(aBuf, m_aPrintCB[i].m_pPrintCallbackUserdata, Highlighted);
-		}
+	case IConsole::OUTPUT_LEVEL_STANDARD:
+		return LEVEL_INFO;
+	case IConsole::OUTPUT_LEVEL_ADDINFO:
+		return LEVEL_DEBUG;
+	case IConsole::OUTPUT_LEVEL_DEBUG:
+		return LEVEL_TRACE;
+	}
+	dbg_assert(0, "invalid log level");
+	return LEVEL_INFO;
+}
+
+LOG_COLOR ColorToLogColor(ColorRGBA Color)
+{
+	return LOG_COLOR{
+		(uint8_t)(Color.r * 255.0),
+		(uint8_t)(Color.g * 255.0),
+		(uint8_t)(Color.b * 255.0)};
+}
+
+void CConsole::Print(int Level, const char *pFrom, const char *pStr, ColorRGBA PrintColor)
+{
+	LEVEL LogLevel = IConsole::ToLogLevel(Level);
+	// if the color is pure white, use default terminal color
+	if(mem_comp(&PrintColor, &gs_ConsoleDefaultColor, sizeof(ColorRGBA)) != 0)
+	{
+		log_log_color(LogLevel, ColorToLogColor(PrintColor), pFrom, "%s", pStr);
+	}
+	else
+	{
+		log_log(LogLevel, pFrom, "%s", pStr);
 	}
 }
 
@@ -331,6 +340,24 @@ void CConsole::SetTeeHistorianCommandCallback(FTeeHistorianCommandCallback pfnCa
 {
 	m_pfnTeeHistorianCommandCallback = pfnCallback;
 	m_pTeeHistorianCommandUserdata = pUser;
+}
+
+void CConsole::InitChecksum(CChecksumData *pData) const
+{
+	pData->m_NumCommands = 0;
+	for(CCommand *pCommand = m_pFirstCommand; pCommand; pCommand = pCommand->m_pNext)
+	{
+		if(pData->m_NumCommands < (int)(std::size(pData->m_aCommandsChecksum)))
+		{
+			FCommandCallback pfnCallback = pCommand->m_pfnCallback;
+			void *pUserData = pCommand->m_pUserData;
+			TraverseChain(&pfnCallback, &pUserData);
+			int CallbackBits = (uintptr_t)pfnCallback & 0xfff;
+			int *pTarget = &pData->m_aCommandsChecksum[pData->m_NumCommands];
+			*pTarget = ((uint8_t)pCommand->m_pName[0]) | ((uint8_t)pCommand->m_pName[1] << 8) | (CallbackBits << 16);
+		}
+		pData->m_NumCommands += 1;
+	}
 }
 
 bool CConsole::LineIsValid(const char *pStr)
@@ -456,7 +483,7 @@ void CConsole::ExecuteLineStroked(int Stroke, const char *pStr, int ClientID, bo
 				if(Result.m_pCommand[0] == '+')
 				{
 					// insert the stroke direction token
-					Result.AddArgument(m_paStrokeStr[Stroke]);
+					Result.AddArgument(m_apStrokeStr[Stroke]);
 					IsStrokeCommand = 1;
 				}
 
@@ -466,7 +493,7 @@ void CConsole::ExecuteLineStroked(int Stroke, const char *pStr, int ClientID, bo
 					{
 						char aBuf[256];
 						str_format(aBuf, sizeof(aBuf), "Invalid arguments... Usage: %s %s", pCommand->m_pName, pCommand->m_pParams);
-						Print(OUTPUT_LEVEL_STANDARD, "console", aBuf);
+						Print(OUTPUT_LEVEL_STANDARD, "chatresp", aBuf);
 					}
 					else if(m_StoreCommands && pCommand->m_Flags & CFGFLAG_STORE)
 					{
@@ -517,23 +544,28 @@ void CConsole::ExecuteLineStroked(int Stroke, const char *pStr, int ClientID, bo
 		{
 			char aBuf[256];
 			str_format(aBuf, sizeof(aBuf), "No such command: %s.", Result.m_pCommand);
-			Print(OUTPUT_LEVEL_STANDARD, "console", aBuf);
+			Print(OUTPUT_LEVEL_STANDARD, "chatresp", aBuf);
 		}
 
 		pStr = pNextPart;
 	}
 }
 
-void CConsole::PossibleCommands(const char *pStr, int FlagMask, bool Temp, FPossibleCallback pfnCallback, void *pUser)
+int CConsole::PossibleCommands(const char *pStr, int FlagMask, bool Temp, FPossibleCallback pfnCallback, void *pUser)
 {
+	int Index = 0;
 	for(CCommand *pCommand = m_pFirstCommand; pCommand; pCommand = pCommand->m_pNext)
 	{
 		if(pCommand->m_Flags & FlagMask && pCommand->m_Temp == Temp)
 		{
 			if(str_find_nocase(pCommand->m_pName, pStr))
-				pfnCallback(pCommand->m_pName, pUser);
+			{
+				pfnCallback(Index, pCommand->m_pName, pUser);
+				Index++;
+			}
 		}
 	}
+	return Index;
 }
 
 CConsole::CCommand *CConsole::FindCommand(const char *pName, int FlagMask)
@@ -572,8 +604,6 @@ void CConsole::ExecuteFile(const char *pFilename, int ClientID, bool LogFailure,
 			return;
 
 	if(!m_pStorage)
-		m_pStorage = Kernel()->RequestInterface<IStorage>();
-	if(!m_pStorage)
 		return;
 
 	// push this one to the stack
@@ -584,19 +614,19 @@ void CConsole::ExecuteFile(const char *pFilename, int ClientID, bool LogFailure,
 	m_pFirstExec = &ThisFile;
 
 	// exec the file
-	IOHANDLE File = m_pStorage->OpenFile(pFilename, IOFLAG_READ, StorageType);
+	IOHANDLE File = m_pStorage->OpenFile(pFilename, IOFLAG_READ | IOFLAG_SKIP_BOM, StorageType);
 
 	char aBuf[128];
 	if(File)
 	{
 		char *pLine;
-		CLineReader lr;
+		CLineReader Reader;
 
 		str_format(aBuf, sizeof(aBuf), "executing '%s'", pFilename);
 		Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", aBuf);
-		lr.Init(File);
+		Reader.Init(File);
 
-		while((pLine = lr.Get()))
+		while((pLine = Reader.Get()))
 			ExecuteLine(pLine, ClientID);
 
 		io_close(File);
@@ -675,15 +705,15 @@ void CConsole::ConCommandStatus(IResult *pResult, void *pUser)
 			}
 			else
 			{
-				pConsole->Print(OUTPUT_LEVEL_STANDARD, "console", aBuf);
+				pConsole->Print(OUTPUT_LEVEL_STANDARD, "chatresp", aBuf);
 				mem_zero(aBuf, sizeof(aBuf));
-				str_copy(aBuf, pCommand->m_pName, sizeof(aBuf));
+				str_copy(aBuf, pCommand->m_pName);
 				Used = Length;
 			}
 		}
 	}
 	if(Used > 0)
-		pConsole->Print(OUTPUT_LEVEL_STANDARD, "console", aBuf);
+		pConsole->Print(OUTPUT_LEVEL_STANDARD, "chatresp", aBuf);
 }
 
 void CConsole::ConUserCommandStatus(IResult *pResult, void *pUser)
@@ -772,19 +802,19 @@ static void ColVariableCommand(IConsole::IResult *pResult, void *pUserData)
 		str_format(aBuf, sizeof(aBuf), "Value: %u", *(pData->m_pVariable));
 		pData->m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", aBuf);
 
-		ColorHSLA hsl(*(pData->m_pVariable), true);
+		ColorHSLA Hsla(*(pData->m_pVariable), true);
 		if(pData->m_Light)
-			hsl = hsl.UnclampLighting();
-		str_format(aBuf, sizeof(aBuf), "H: %d°, S: %d%%, L: %d%%", round_truncate(hsl.h * 360), round_truncate(hsl.s * 100), round_truncate(hsl.l * 100));
+			Hsla = Hsla.UnclampLighting();
+		str_format(aBuf, sizeof(aBuf), "H: %d°, S: %d%%, L: %d%%", round_truncate(Hsla.h * 360), round_truncate(Hsla.s * 100), round_truncate(Hsla.l * 100));
 		pData->m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", aBuf);
 
-		ColorRGBA rgb = color_cast<ColorRGBA>(hsl);
-		str_format(aBuf, sizeof(aBuf), "R: %d, G: %d, B: %d, #%06X", round_truncate(rgb.r * 255), round_truncate(rgb.g * 255), round_truncate(rgb.b * 255), rgb.Pack(false));
+		ColorRGBA Rgba = color_cast<ColorRGBA>(Hsla);
+		str_format(aBuf, sizeof(aBuf), "R: %d, G: %d, B: %d, #%06X", round_truncate(Rgba.r * 255), round_truncate(Rgba.g * 255), round_truncate(Rgba.b * 255), Rgba.Pack(false));
 		pData->m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", aBuf);
 
 		if(pData->m_Alpha)
 		{
-			str_format(aBuf, sizeof(aBuf), "A: %d%%", round_truncate(hsl.a * 100));
+			str_format(aBuf, sizeof(aBuf), "A: %d%%", round_truncate(Hsla.a * 100));
 			pData->m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", aBuf);
 		}
 	}
@@ -828,6 +858,16 @@ static void StrVariableCommand(IConsole::IResult *pResult, void *pUserData)
 	}
 }
 
+void CConsole::TraverseChain(FCommandCallback *ppfnCallback, void **ppUserData)
+{
+	while(*ppfnCallback == Con_Chain)
+	{
+		CChain *pChainInfo = static_cast<CChain *>(*ppUserData);
+		*ppfnCallback = pChainInfo->m_pfnCallback;
+		*ppUserData = pChainInfo->m_pCallbackUserData;
+	}
+}
+
 void CConsole::ConToggle(IConsole::IResult *pResult, void *pUser)
 {
 	CConsole *pConsole = static_cast<CConsole *>(pUser);
@@ -837,15 +877,7 @@ void CConsole::ConToggle(IConsole::IResult *pResult, void *pUser)
 	{
 		FCommandCallback pfnCallback = pCommand->m_pfnCallback;
 		void *pUserData = pCommand->m_pUserData;
-
-		// check for chain
-		if(pCommand->m_pfnCallback == Con_Chain)
-		{
-			CChain *pChainInfo = static_cast<CChain *>(pCommand->m_pUserData);
-			pfnCallback = pChainInfo->m_pfnCallback;
-			pUserData = pChainInfo->m_pCallbackUserData;
-		}
-
+		TraverseChain(&pfnCallback, &pUserData);
 		if(pfnCallback == IntVariableCommand)
 		{
 			CIntVariableData *pData = static_cast<CIntVariableData *>(pUserData);
@@ -896,14 +928,8 @@ void CConsole::ConToggleStroke(IConsole::IResult *pResult, void *pUser)
 	if(pCommand)
 	{
 		FCommandCallback pfnCallback = pCommand->m_pfnCallback;
-
-		// check for chain
-		if(pCommand->m_pfnCallback == Con_Chain)
-		{
-			CChain *pChainInfo = static_cast<CChain *>(pCommand->m_pUserData);
-			pfnCallback = pChainInfo->m_pfnCallback;
-		}
-
+		void *pUserData = pCommand->m_pUserData;
+		TraverseChain(&pfnCallback, &pUserData);
 		if(pfnCallback == IntVariableCommand)
 		{
 			int Val = pResult->GetInteger(0) == 0 ? pResult->GetInteger(3) : pResult->GetInteger(2);
@@ -928,13 +954,11 @@ CConsole::CConsole(int FlagMask)
 	m_pRecycleList = 0;
 	m_TempCommands.Reset();
 	m_StoreCommands = true;
-	m_paStrokeStr[0] = "0";
-	m_paStrokeStr[1] = "1";
+	m_apStrokeStr[0] = "0";
+	m_apStrokeStr[1] = "1";
 	m_ExecutionQueue.Reset();
 	m_pFirstCommand = 0;
 	m_pFirstExec = 0;
-	mem_zero(m_aPrintCB, sizeof(m_aPrintCB));
-	m_NumPrintCB = 0;
 	m_pfnTeeHistorianCommandCallback = 0;
 	m_pTeeHistorianCommandUserdata = 0;
 
@@ -951,33 +975,6 @@ CConsole::CConsole(int FlagMask)
 	Register("access_status", "i[accesslevel]", CFGFLAG_SERVER, ConCommandStatus, this, "List all commands which are accessible for admin = 0, moderator = 1, helper = 2, all = 3");
 	Register("cmdlist", "", CFGFLAG_SERVER | CFGFLAG_CHAT, ConUserCommandStatus, this, "List all commands which are accessible for users");
 
-// TODO: this should disappear
-#define MACRO_CONFIG_INT(Name, ScriptName, Def, Min, Max, Flags, Desc) \
-	{ \
-		static CIntVariableData Data = {this, &g_Config.m_##Name, Min, Max, Def}; \
-		Register(#ScriptName, "?i", Flags, IntVariableCommand, &Data, Desc); \
-	}
-
-#define MACRO_CONFIG_COL(Name, ScriptName, Def, Flags, Desc) \
-	{ \
-		static CColVariableData Data = {this, &g_Config.m_##Name, static_cast<bool>((Flags)&CFGFLAG_COLLIGHT), \
-			static_cast<bool>((Flags)&CFGFLAG_COLALPHA), Def}; \
-		Register(#ScriptName, "?i", Flags, ColVariableCommand, &Data, Desc); \
-	}
-
-#define MACRO_CONFIG_STR(Name, ScriptName, Len, Def, Flags, Desc) \
-	{ \
-		static char OldValue[Len] = Def; \
-		static CStrVariableData Data = {this, g_Config.m_##Name, Len, OldValue}; \
-		Register(#ScriptName, "?r", Flags, StrVariableCommand, &Data, Desc); \
-	}
-
-#include "config_variables.h"
-
-#undef MACRO_CONFIG_INT
-#undef MACRO_CONFIG_COL
-#undef MACRO_CONFIG_STR
-
 	// DDRace
 
 	m_Cheated = false;
@@ -989,13 +986,56 @@ CConsole::~CConsole()
 	while(pCommand)
 	{
 		CCommand *pNext = pCommand->m_pNext;
-		if(pCommand->m_pfnCallback == Con_Chain)
-			delete static_cast<CChain *>(pCommand->m_pUserData);
+		{
+			FCommandCallback pfnCallback = pCommand->m_pfnCallback;
+			void *pUserData = pCommand->m_pUserData;
+			CChain *pChain = nullptr;
+			while(pfnCallback == Con_Chain)
+			{
+				pChain = static_cast<CChain *>(pUserData);
+				pfnCallback = pChain->m_pfnCallback;
+				pUserData = pChain->m_pCallbackUserData;
+				delete pChain;
+			}
+		}
 		// Temp commands are on m_TempCommands heap, so don't delete them
 		if(!pCommand->m_Temp)
 			delete pCommand;
 		pCommand = pNext;
 	}
+}
+
+void CConsole::Init()
+{
+	m_pConfig = Kernel()->RequestInterface<IConfigManager>()->Values();
+	m_pStorage = Kernel()->RequestInterface<IStorage>();
+
+// TODO: this should disappear
+#define MACRO_CONFIG_INT(Name, ScriptName, Def, Min, Max, Flags, Desc) \
+	{ \
+		static CIntVariableData Data = {this, &g_Config.m_##Name, Min, Max, Def}; \
+		Register(#ScriptName, "?i", Flags, IntVariableCommand, &Data, Desc " (default: " #Def ", min: " #Min ", max: " #Max ")"); \
+	}
+
+#define MACRO_CONFIG_COL(Name, ScriptName, Def, Flags, Desc) \
+	{ \
+		static CColVariableData Data = {this, &g_Config.m_##Name, static_cast<bool>((Flags)&CFGFLAG_COLLIGHT), \
+			static_cast<bool>((Flags)&CFGFLAG_COLALPHA), Def}; \
+		Register(#ScriptName, "?i", Flags, ColVariableCommand, &Data, Desc " (default: " #Def ")"); \
+	}
+
+#define MACRO_CONFIG_STR(Name, ScriptName, Len, Def, Flags, Desc) \
+	{ \
+		static char s_aOldValue[Len] = Def; \
+		static CStrVariableData Data = {this, g_Config.m_##Name, Len, s_aOldValue}; \
+		Register(#ScriptName, "?r", Flags, StrVariableCommand, &Data, Desc " (default: " #Def ", max length: " #Len ")"); \
+	}
+
+#include "config_variables.h"
+
+#undef MACRO_CONFIG_INT
+#undef MACRO_CONFIG_COL
+#undef MACRO_CONFIG_STR
 }
 
 void CConsole::ParseArguments(int NumArgs, const char **ppArguments)
@@ -1228,12 +1268,7 @@ void CConsole::ResetServerGameSettings()
 			CCommand *pCommand = FindCommand(#ScriptName, CFGFLAG_SERVER); \
 			void *pUserData = pCommand->m_pUserData; \
 			FCommandCallback pfnCallback = pCommand->m_pfnCallback; \
-			while(pfnCallback == Con_Chain) \
-			{ \
-				CChain *pChainInfo = (CChain *)pUserData; \
-				pUserData = pChainInfo->m_pCallbackUserData; \
-				pfnCallback = pChainInfo->m_pfnCallback; \
-			} \
+			TraverseChain(&pfnCallback, &pUserData); \
 			CIntVariableData *pData = (CIntVariableData *)pUserData; \
 			*pData->m_pVariable = pData->m_OldValue; \
 		} \
@@ -1248,12 +1283,7 @@ void CConsole::ResetServerGameSettings()
 			CCommand *pCommand = FindCommand(#ScriptName, CFGFLAG_SERVER); \
 			void *pUserData = pCommand->m_pUserData; \
 			FCommandCallback pfnCallback = pCommand->m_pfnCallback; \
-			while(pfnCallback == Con_Chain) \
-			{ \
-				CChain *pChainInfo = (CChain *)pUserData; \
-				pUserData = pChainInfo->m_pCallbackUserData; \
-				pfnCallback = pChainInfo->m_pfnCallback; \
-			} \
+			TraverseChain(&pfnCallback, &pUserData); \
 			CStrVariableData *pData = (CStrVariableData *)pUserData; \
 			str_copy(pData->m_pOldValue, pData->m_pStr, pData->m_MaxSize); \
 		} \

@@ -3,11 +3,9 @@
 #ifndef GAME_CLIENT_PREDICTION_ENTITIES_CHARACTER_H
 #define GAME_CLIENT_PREDICTION_ENTITIES_CHARACTER_H
 
-#include "projectile.h"
 #include <game/client/prediction/entity.h>
 
 #include <game/gamecore.h>
-#include <game/generated/client_data.h>
 
 enum
 {
@@ -33,16 +31,20 @@ class CCharacter : public CEntity
 	friend class CGameWorld;
 
 public:
+	~CCharacter();
+
 	//character's size
 	static const int ms_PhysSize = 28;
 
-	virtual void Tick();
-	virtual void TickDefered();
+	void PreTick() override;
+	void Tick() override;
+	void TickDeferred() override;
 
 	bool IsGrounded();
 
 	void SetWeapon(int W);
 	void SetSolo(bool Solo);
+	void SetSuper(bool Super);
 	void HandleWeaponSwitch();
 	void DoWeaponSwitch();
 
@@ -61,36 +63,19 @@ public:
 	void GiveNinja();
 	void RemoveNinja();
 
-	bool IsAlive() { return m_Alive; }
-
-	bool m_Alive;
+	bool m_IsLocal;
 
 	CTeamsCore *TeamsCore();
-	bool Freeze(int Time);
+	bool Freeze(int Seconds);
 	bool Freeze();
 	bool UnFreeze();
 	void GiveAllWeapons();
 	int Team();
 	bool CanCollide(int ClientID);
 	bool SameTeam(int ClientID);
-	bool m_Super;
-	bool m_SuperJump;
-	bool m_Jetpack;
 	bool m_NinjaJetpack;
 	int m_FreezeTime;
-	int m_FreezeTick;
 	bool m_FrozenLastTick;
-	bool m_DeepFreeze;
-	bool m_EndlessHook;
-	enum
-	{
-		HIT_ALL = 0,
-		DISABLE_HIT_HAMMER = 1,
-		DISABLE_HIT_SHOTGUN = 2,
-		DISABLE_HIT_GRENADE = 4,
-		DISABLE_HIT_LASER = 8
-	};
-	int m_Hit;
 	int m_TuneZone;
 	vec2 m_PrevPos;
 	vec2 m_PrevPrevPos;
@@ -103,20 +88,20 @@ public:
 	bool m_LastRefillJumps;
 
 	// Setters/Getters because i don't want to modify vanilla vars access modifiers
-	int GetLastWeapon() { return m_LastWeapon; };
-	void SetLastWeapon(int LastWeap) { m_LastWeapon = LastWeap; };
-	int GetActiveWeapon() { return m_Core.m_ActiveWeapon; };
+	int GetLastWeapon() { return m_LastWeapon; }
+	void SetLastWeapon(int LastWeap) { m_LastWeapon = LastWeap; }
+	int GetActiveWeapon() { return m_Core.m_ActiveWeapon; }
 	void SetActiveWeapon(int ActiveWeap);
-	CCharacterCore GetCore() { return m_Core; };
-	void SetCore(CCharacterCore Core) { m_Core = Core; };
-	CCharacterCore *Core() { return &m_Core; };
-	bool GetWeaponGot(int Type) { return m_aWeapons[Type].m_Got; };
-	void SetWeaponGot(int Type, bool Value) { m_aWeapons[Type].m_Got = Value; };
-	int GetWeaponAmmo(int Type) { return m_aWeapons[Type].m_Ammo; };
-	void SetWeaponAmmo(int Type, int Value) { m_aWeapons[Type].m_Ammo = Value; };
-	void SetNinjaActivationDir(vec2 ActivationDir) { m_Ninja.m_ActivationDir = ActivationDir; };
-	void SetNinjaActivationTick(int ActivationTick) { m_Ninja.m_ActivationTick = ActivationTick; };
-	void SetNinjaCurrentMoveTime(int CurrentMoveTime) { m_Ninja.m_CurrentMoveTime = CurrentMoveTime; };
+	CCharacterCore GetCore() { return m_Core; }
+	void SetCore(CCharacterCore Core) { m_Core = Core; }
+	CCharacterCore *Core() { return &m_Core; }
+	bool GetWeaponGot(int Type) { return m_Core.m_aWeapons[Type].m_Got; }
+	void SetWeaponGot(int Type, bool Value) { m_Core.m_aWeapons[Type].m_Got = Value; }
+	int GetWeaponAmmo(int Type) { return m_Core.m_aWeapons[Type].m_Ammo; }
+	void SetWeaponAmmo(int Type, int Value) { m_Core.m_aWeapons[Type].m_Ammo = Value; }
+	void SetNinjaActivationDir(vec2 ActivationDir) { m_Core.m_Ninja.m_ActivationDir = ActivationDir; }
+	void SetNinjaActivationTick(int ActivationTick) { m_Core.m_Ninja.m_ActivationTick = ActivationTick; }
+	void SetNinjaCurrentMoveTime(int CurrentMoveTime) { m_Core.m_Ninja.m_CurrentMoveTime = CurrentMoveTime; }
 	int GetCID() { return m_ID; }
 	void SetInput(CNetObj_PlayerInput *pNewInput)
 	{
@@ -143,21 +128,19 @@ public:
 
 	bool Match(CCharacter *pChar);
 	void ResetPrediction();
-	CCharacter() { m_Alive = false; }
 	void SetTuneZone(int Zone);
+
+	bool HammerHitDisabled() { return m_Core.m_HammerHitDisabled; }
+	bool ShotgunHitDisabled() { return m_Core.m_ShotgunHitDisabled; }
+	bool LaserHitDisabled() { return m_Core.m_LaserHitDisabled; }
+	bool GrenadeHitDisabled() { return m_Core.m_GrenadeHitDisabled; }
+
+	bool IsSuper() { return m_Core.m_Super; }
 
 private:
 	// weapon info
 	int m_aHitObjects[10];
 	int m_NumObjectsHit;
-
-	struct WeaponStat
-	{
-		int m_AmmoRegenStart;
-		int m_Ammo;
-		int m_Ammocost;
-		bool m_Got;
-	} m_aWeapons[NUM_WEAPONS];
 
 	int m_LastWeapon;
 	int m_QueuedWeapon;
@@ -176,15 +159,6 @@ private:
 
 	int m_NumInputs;
 
-	// ninja
-	struct NinjaStat
-	{
-		vec2 m_ActivationDir;
-		int m_ActivationTick;
-		int m_CurrentMoveTime;
-		int m_OldVelAmount;
-	} m_Ninja;
-
 	// the player core for the physics
 	CCharacterCore m_Core;
 
@@ -196,6 +170,8 @@ private:
 	void DDRaceTick();
 	void DDRacePostCoreTick();
 	void HandleTuneLayer();
+
+	CTuningParams *CharacterTuning();
 
 	int m_StrongWeakID;
 

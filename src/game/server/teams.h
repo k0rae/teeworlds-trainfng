@@ -6,18 +6,45 @@
 #include <game/server/gamecontext.h>
 #include <game/teamscore.h>
 
+class CCharacter;
+class CPlayer;
+struct CScoreSaveResult;
+
 class CGameTeams
 {
-	int m_TeamState[MAX_CLIENTS];
-	bool m_TeeFinished[MAX_CLIENTS];
-	bool m_TeamLocked[MAX_CLIENTS];
-	uint64 m_Invited[MAX_CLIENTS];
-	bool m_Practice[MAX_CLIENTS];
-	std::shared_ptr<CScoreSaveResult> m_pSaveTeamResult[MAX_CLIENTS];
+	// `m_TeeStarted` is used to keep track whether a given tee has hit the
+	// start of the map yet. If a tee that leaves hasn't hit the start line
+	// yet, the team will be marked as "not allowed to finish"
+	// (`TEAMSTATE_STARTED_UNFINISHABLE`). If this were not the case, tees
+	// could go around the startline on a map, leave one tee behind at
+	// start, go to the finish line, let the tee start and kill, allowing
+	// the team to finish instantly.
+	bool m_aTeeStarted[MAX_CLIENTS];
+	bool m_aTeeFinished[MAX_CLIENTS];
+	int m_aLastChat[MAX_CLIENTS];
+
+	int m_aTeamState[NUM_TEAMS];
+	bool m_aTeamLocked[NUM_TEAMS];
+	uint64_t m_aInvited[NUM_TEAMS];
+	bool m_aPractice[NUM_TEAMS];
+	std::shared_ptr<CScoreSaveResult> m_apSaveTeamResult[NUM_TEAMS];
+	uint64_t m_aLastSwap[NUM_TEAMS];
+	bool m_aTeamSentStartWarning[NUM_TEAMS];
+	// `m_aTeamUnfinishableKillTick` is -1 by default and gets set when a
+	// team becomes unfinishable. If the team hasn't entered practice mode
+	// by that time, it'll get killed to prevent people not understanding
+	// the message from playing for a long time in an unfinishable team.
+	int m_aTeamUnfinishableKillTick[NUM_TEAMS];
 
 	class CGameContext *m_pGameContext;
 
-	void CheckTeamFinished(int ClientID);
+	/**
+	* Kill the whole team.
+	* @param Team The team id to kill
+	* @param NewStrongID The player with that id will get strong hook on everyone else, -1 will set the normal spawning order
+	* @param ExceptID The player that should not get killed
+	*/
+	void KillTeam(int Team, int NewStrongID, int ExceptID = -1);
 	bool TeamFinished(int Team);
 	void OnTeamFinish(CPlayer **Players, unsigned int Size, float Time, const char *pTimestamp);
 	void OnFinish(CPlayer *Player, float Time, const char *pTimestamp);
@@ -28,6 +55,9 @@ public:
 		TEAMSTATE_EMPTY,
 		TEAMSTATE_OPEN,
 		TEAMSTATE_STARTED,
+		// Happens when a tee that hasn't hit the start tiles leaves
+		// the team.
+		TEAMSTATE_STARTED_UNFINISHABLE,
 		TEAMSTATE_FINISHED
 	};
 
@@ -35,7 +65,7 @@ public:
 
 	CGameTeams(CGameContext *pGameContext);
 
-	//helper methods
+	// helper methods
 	CCharacter *Character(int ClientID)
 	{
 		return GameServer()->GetPlayerChar(ClientID);
@@ -58,22 +88,23 @@ public:
 	void OnCharacterFinish(int ClientID);
 	void OnCharacterSpawn(int ClientID);
 	void OnCharacterDeath(int ClientID, int Weapon);
+	void Tick();
 
-	bool SetCharacterTeam(int ClientID, int Team);
+	// returns nullptr if successful, error string if failed
+	const char *SetCharacterTeam(int ClientID, int Team);
+	void CheckTeamFinished(int Team);
 
 	void ChangeTeamState(int Team, int State);
-	void onChangeTeamState(int Team, int State, int OldState);
 
-	int64 TeamMask(int Team, int ExceptID = -1, int Asker = -1);
+	int64_t TeamMask(int Team, int ExceptID = -1, int Asker = -1);
 
 	int Count(int Team) const;
 
-	//need to be very careful using this method. SERIOUSLY...
+	// need to be very careful using this method. SERIOUSLY...
 	void SetForceCharacterTeam(int ClientID, int Team);
-	void SetForceCharacterNewTeam(int ClientID, int Team);
-	void ForceLeaveTeam(int ClientID);
 
 	void Reset();
+	void ResetRoundState(int Team);
 	void ResetSwitchers(int Team);
 
 	void SendTeamsState(int ClientID);
@@ -81,26 +112,33 @@ public:
 	void ResetInvited(int Team);
 	void SetClientInvited(int Team, int ClientID, bool Invited);
 
-	int m_LastChat[MAX_CLIENTS];
-
 	int GetDDRaceState(CPlayer *Player);
 	int GetStartTime(CPlayer *Player);
-	float *GetCpCurrent(CPlayer *Player);
+	float *GetCurrentTimeCp(CPlayer *Player);
 	void SetDDRaceState(CPlayer *Player, int DDRaceState);
 	void SetStartTime(CPlayer *Player, int StartTime);
-	void SetCpActive(CPlayer *Player, int CpActive);
+	void SetLastTimeCp(CPlayer *Player, int LastTimeCp);
 	void KillSavedTeam(int ClientID, int Team);
 	void ResetSavedTeam(int ClientID, int Team);
+	void RequestTeamSwap(CPlayer *pPlayer, CPlayer *pTargetPlayer, int Team);
+	void SwapTeamCharacters(CPlayer *pPrimaryPlayer, CPlayer *pTargetPlayer, int Team);
 	void ProcessSaveTeam();
+
+	int GetFirstEmptyTeam() const;
+
+	bool TeeStarted(int ClientID)
+	{
+		return m_aTeeStarted[ClientID];
+	}
 
 	bool TeeFinished(int ClientID)
 	{
-		return m_TeeFinished[ClientID];
+		return m_aTeeFinished[ClientID];
 	}
 
 	int GetTeamState(int Team)
 	{
-		return m_TeamState[Team];
+		return m_aTeamState[Team];
 	}
 
 	bool TeamLocked(int Team)
@@ -108,52 +146,62 @@ public:
 		if(Team <= TEAM_FLOCK || Team >= TEAM_SUPER)
 			return false;
 
-		return m_TeamLocked[Team];
+		return m_aTeamLocked[Team];
 	}
 
 	bool IsInvited(int Team, int ClientID)
 	{
-		return m_Invited[Team] & 1LL << ClientID;
+		return m_aInvited[Team] & 1LL << ClientID;
 	}
 
-	void SetFinished(int ClientID, bool finished)
+	bool IsStarted(int Team)
 	{
-		m_TeeFinished[ClientID] = finished;
+		return m_aTeamState[Team] == CGameTeams::TEAMSTATE_STARTED;
 	}
 
-	void SetSaving(int TeamID, std::shared_ptr<CScoreSaveResult> SaveResult)
+	void SetStarted(int ClientID, bool Started)
 	{
-		m_pSaveTeamResult[TeamID] = SaveResult;
+		m_aTeeStarted[ClientID] = Started;
+	}
+
+	void SetFinished(int ClientID, bool Finished)
+	{
+		m_aTeeFinished[ClientID] = Finished;
+	}
+
+	void SetSaving(int TeamID, std::shared_ptr<CScoreSaveResult> &SaveResult)
+	{
+		m_apSaveTeamResult[TeamID] = SaveResult;
 	}
 
 	bool GetSaving(int TeamID)
 	{
 		if(TeamID < TEAM_FLOCK || TeamID >= TEAM_SUPER)
 			return false;
-		if(g_Config.m_SvTeam != 3 && TeamID == TEAM_FLOCK)
+		if(g_Config.m_SvTeam != SV_TEAM_FORCED_SOLO && TeamID == TEAM_FLOCK)
 			return false;
 
-		return m_pSaveTeamResult[TeamID] != nullptr;
+		return m_apSaveTeamResult[TeamID] != nullptr;
 	}
 
-	void EnablePractice(int Team)
+	void SetPractice(int Team, bool Enabled)
 	{
 		if(Team < TEAM_FLOCK || Team >= TEAM_SUPER)
 			return;
-		if(g_Config.m_SvTeam != 3 && Team == TEAM_FLOCK)
+		if(g_Config.m_SvTeam != SV_TEAM_FORCED_SOLO && Team == TEAM_FLOCK)
 			return;
 
-		m_Practice[Team] = true;
+		m_aPractice[Team] = Enabled;
 	}
 
 	bool IsPractice(int Team)
 	{
 		if(Team < TEAM_FLOCK || Team >= TEAM_SUPER)
 			return false;
-		if(g_Config.m_SvTeam != 3 && Team == TEAM_FLOCK)
+		if(g_Config.m_SvTeam != SV_TEAM_FORCED_SOLO && Team == TEAM_FLOCK)
 			return false;
 
-		return m_Practice[Team];
+		return m_aPractice[Team];
 	}
 };
 

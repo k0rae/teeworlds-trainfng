@@ -4,6 +4,9 @@
 #define GAME_CLIENT_COMPONENTS_PLAYERS_H
 #include <game/client/component.h>
 
+#include <game/client/render.h>
+#include <game/generated/protocol.h>
+
 class CPlayers : public CComponent
 {
 	friend class CGhost;
@@ -23,15 +26,25 @@ class CPlayers : public CComponent
 		const CTeeRenderInfo *pRenderInfo,
 		int ClientID,
 		float Intra = 0.f);
+	void RenderHookCollLine(
+		const CNetObj_Character *pPrevChar,
+		const CNetObj_Character *pPlayerChar,
+		int ClientID,
+		float Intra = 0.f);
+	float GetPlayerTargetAngle(
+		const CNetObj_Character *pPrevChar,
+		const CNetObj_Character *pPlayerChar,
+		int ClientID,
+		float Intra = 0.f);
+	bool IsPlayerInfoAvailable(int ClientID) const;
 
 	int m_WeaponEmoteQuadContainerIndex;
-	int m_DirectionQuadContainerIndex;
-	int m_WeaponSpriteMuzzleQuadContainerIndex[NUM_WEAPONS];
+	int m_aWeaponSpriteMuzzleQuadContainerIndex[NUM_WEAPONS];
 
 public:
-	vec2 m_CurPredictedPos[MAX_CLIENTS];
-	virtual void OnInit();
-	virtual void OnRender();
+	virtual int Sizeof() const override { return sizeof(*this); }
+	virtual void OnInit() override;
+	virtual void OnRender() override;
 };
 
 #endif

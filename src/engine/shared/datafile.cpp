@@ -4,20 +4,18 @@
 #include "datafile.h"
 
 #include <base/hash_ctxt.h>
-#include <base/math.h>
 #include <base/system.h>
 #include <engine/storage.h>
 
 #include "uuid_manager.h"
 
-#include <zlib.h>
+#include <cstdlib>
 
 static const int DEBUG = 0;
 
 enum
 {
 	OFFSET_UUID_TYPE = 0x8000,
-	ITEMTYPE_EX = 0xffff,
 };
 
 struct CItemEx
@@ -28,13 +26,7 @@ struct CItemEx
 	{
 		CItemEx Result;
 		for(int i = 0; i < (int)sizeof(CUuid) / 4; i++)
-		{
-			Result.m_aUuid[i] =
-				(Uuid.m_aData[i * 4 + 0] << 24) |
-				(Uuid.m_aData[i * 4 + 1] << 16) |
-				(Uuid.m_aData[i * 4 + 2] << 8) |
-				(Uuid.m_aData[i * 4 + 3]);
-		}
+			Result.m_aUuid[i] = bytes_be_to_int(&Uuid.m_aData[i * 4]);
 		return Result;
 	}
 
@@ -42,20 +34,10 @@ struct CItemEx
 	{
 		CUuid Result;
 		for(int i = 0; i < (int)sizeof(CUuid) / 4; i++)
-		{
-			Result.m_aData[i * 4 + 0] = m_aUuid[i] >> 24;
-			Result.m_aData[i * 4 + 1] = m_aUuid[i] >> 16;
-			Result.m_aData[i * 4 + 2] = m_aUuid[i] >> 8;
-			Result.m_aData[i * 4 + 3] = m_aUuid[i];
-		}
+			int_to_bytes_be(&Result.m_aData[i * 4], m_aUuid[i]);
 		return Result;
 	}
 };
-
-static int GetTypeFromIndex(int Index)
-{
-	return ITEMTYPE_EX - Index - 1;
-}
 
 struct CDatafileItemType
 {
@@ -140,12 +122,12 @@ bool CDataFileReader::Open(class IStorage *pStorage, const char *pFilename, int 
 		sha256_init(&Sha256Ctxt);
 		unsigned char aBuffer[BUFFER_SIZE];
 
-		while(1)
+		while(true)
 		{
 			unsigned Bytes = io_read(File, aBuffer, BUFFER_SIZE);
 			if(Bytes <= 0)
 				break;
-			Crc = crc32(Crc, aBuffer, Bytes); // ignore_convention
+			Crc = crc32(Crc, aBuffer, Bytes);
 			sha256_update(&Sha256Ctxt, aBuffer, Bytes);
 		}
 		Sha256 = sha256_finish(&Sha256Ctxt);
@@ -158,14 +140,14 @@ bool CDataFileReader::Open(class IStorage *pStorage, const char *pFilename, int 
 	if(sizeof(Header) != io_read(File, &Header, sizeof(Header)))
 	{
 		dbg_msg("datafile", "couldn't load header");
-		return 0;
+		return false;
 	}
 	if(Header.m_aID[0] != 'A' || Header.m_aID[1] != 'T' || Header.m_aID[2] != 'A' || Header.m_aID[3] != 'D')
 	{
 		if(Header.m_aID[0] != 'D' || Header.m_aID[1] != 'A' || Header.m_aID[2] != 'T' || Header.m_aID[3] != 'A')
 		{
 			dbg_msg("datafile", "wrong signature. %x %x %x %x", Header.m_aID[0], Header.m_aID[1], Header.m_aID[2], Header.m_aID[3]);
-			return 0;
+			return false;
 		}
 	}
 
@@ -175,7 +157,7 @@ bool CDataFileReader::Open(class IStorage *pStorage, const char *pFilename, int 
 	if(Header.m_Version != 3 && Header.m_Version != 4)
 	{
 		dbg_msg("datafile", "wrong version. version=%x", Header.m_Version);
-		return 0;
+		return false;
 	}
 
 	// read in the rest except the data
@@ -220,7 +202,7 @@ bool CDataFileReader::Open(class IStorage *pStorage, const char *pFilename, int 
 	swap_endian(m_pDataFile->m_pData, sizeof(int), minimum(static_cast<unsigned>(Header.m_Swaplen), Size) / sizeof(int));
 #endif
 
-	//if(DEBUG)
+	if(DEBUG)
 	{
 		dbg_msg("datafile", "allocsize=%d", AllocSize);
 		dbg_msg("datafile", "readsize=%d", ReadSize);
@@ -241,46 +223,10 @@ bool CDataFileReader::Open(class IStorage *pStorage, const char *pFilename, int 
 
 	dbg_msg("datafile", "loading done. datafile='%s'", pFilename);
 
-	if(DEBUG)
-	{
-		/*
-		for(int i = 0; i < m_pDataFile->data.num_raw_data; i++)
-		{
-			void *p = datafile_get_data(df, i);
-			dbg_msg("datafile", "%d %d", (int)((char*)p - (char*)(&m_pDataFile->data)), size);
-		}
-
-		for(int i = 0; i < datafile_num_items(df); i++)
-		{
-			int type, id;
-			void *data = datafile_get_item(df, i, &type, &id);
-			dbg_msg("map", "\t%d: type=%x id=%x p=%p offset=%d", i, type, id, data, m_pDataFile->info.item_offsets[i]);
-			int *idata = (int*)data;
-			for(int k = 0; k < 3; k++)
-				dbg_msg("datafile", "\t\t%d=%d (%x)", k, idata[k], idata[k]);
-		}
-
-		for(int i = 0; i < m_pDataFile->data.num_m_aItemTypes; i++)
-		{
-			dbg_msg("map", "\t%d: type=%x start=%d num=%d", i,
-				m_pDataFile->info.m_aItemTypes[i].type,
-				m_pDataFile->info.m_aItemTypes[i].start,
-				m_pDataFile->info.m_aItemTypes[i].num);
-			for(int k = 0; k < m_pDataFile->info.m_aItemTypes[i].num; k++)
-			{
-				int type, id;
-				datafile_get_item(df, m_pDataFile->info.m_aItemTypes[i].start+k, &type, &id);
-				if(type != m_pDataFile->info.m_aItemTypes[i].type)
-					dbg_msg("map", "\tERROR");
-			}
-		}
-		*/
-	}
-
 	return true;
 }
 
-int CDataFileReader::NumData()
+int CDataFileReader::NumData() const
 {
 	if(!m_pDataFile)
 	{
@@ -351,7 +297,7 @@ void *CDataFileReader::GetDataImpl(int Index, int Swap)
 
 			// decompress the data, TODO: check for errors
 			s = UncompressedSize;
-			uncompress((Bytef *)m_pDataFile->m_ppDataPtrs[Index], &s, (Bytef *)pTemp, DataSize); // ignore_convention
+			uncompress((Bytef *)m_pDataFile->m_ppDataPtrs[Index], &s, (Bytef *)pTemp, DataSize);
 #if defined(CONF_ARCH_ENDIAN_BIG)
 			SwapSize = s;
 #endif
@@ -397,7 +343,7 @@ void CDataFileReader::UnloadData(int Index)
 	m_pDataFile->m_ppDataPtrs[Index] = 0x0;
 }
 
-int CDataFileReader::GetItemSize(int Index)
+int CDataFileReader::GetItemSize(int Index) const
 {
 	if(!m_pDataFile)
 		return 0;
@@ -457,17 +403,17 @@ void *CDataFileReader::GetItem(int Index, int *pType, int *pID)
 		return 0;
 	}
 
-	CDatafileItem *i = (CDatafileItem *)(m_pDataFile->m_Info.m_pItemStart + m_pDataFile->m_Info.m_pItemOffsets[Index]);
+	CDatafileItem *pItem = (CDatafileItem *)(m_pDataFile->m_Info.m_pItemStart + m_pDataFile->m_Info.m_pItemOffsets[Index]);
 	if(pType)
 	{
 		// remove sign extension
-		*pType = GetExternalItemType((i->m_TypeAndID >> 16) & 0xffff);
+		*pType = GetExternalItemType((pItem->m_TypeAndID >> 16) & 0xffff);
 	}
 	if(pID)
 	{
-		*pID = i->m_TypeAndID & 0xffff;
+		*pID = pItem->m_TypeAndID & 0xffff;
 	}
-	return (void *)(i + 1);
+	return (void *)(pItem + 1);
 }
 
 void CDataFileReader::GetType(int Type, int *pStart, int *pNum)
@@ -521,7 +467,7 @@ void *CDataFileReader::FindItem(int Type, int ID)
 	return GetItem(Index, 0, 0);
 }
 
-int CDataFileReader::NumItems()
+int CDataFileReader::NumItems() const
 {
 	if(!m_pDataFile)
 		return 0;
@@ -544,28 +490,28 @@ bool CDataFileReader::Close()
 	return true;
 }
 
-SHA256_DIGEST CDataFileReader::Sha256()
+SHA256_DIGEST CDataFileReader::Sha256() const
 {
 	if(!m_pDataFile)
 	{
 		SHA256_DIGEST Result;
-		for(unsigned i = 0; i < sizeof(Result.data); i++)
+		for(unsigned char &d : Result.data)
 		{
-			Result.data[i] = 0xff;
+			d = 0xff;
 		}
 		return Result;
 	}
 	return m_pDataFile->m_Sha256;
 }
 
-unsigned CDataFileReader::Crc()
+unsigned CDataFileReader::Crc() const
 {
 	if(!m_pDataFile)
 		return 0xFFFFFFFF;
 	return m_pDataFile->m_Crc;
 }
 
-int CDataFileReader::MapSize()
+int CDataFileReader::MapSize() const
 {
 	if(!m_pDataFile)
 		return 0;
@@ -592,11 +538,9 @@ CDataFileWriter::~CDataFileWriter()
 	free(m_pItemTypes);
 	m_pItemTypes = 0;
 	for(int i = 0; i < m_NumItems; i++)
-		if(m_pItems[i].m_pData)
-			free(m_pItems[i].m_pData);
+		free(m_pItems[i].m_pData);
 	for(int i = 0; i < m_NumDatas; ++i)
-		if(m_pDatas[i].m_pCompressedData)
-			free(m_pDatas[i].m_pCompressedData);
+		free(m_pDatas[i].m_pCompressedData);
 	free(m_pItems);
 	m_pItems = 0;
 	free(m_pDatas);
@@ -631,6 +575,11 @@ bool CDataFileWriter::Open(class IStorage *pStorage, const char *pFilename, int 
 {
 	Init();
 	return OpenFile(pStorage, pFilename, StorageType);
+}
+
+int CDataFileWriter::GetTypeFromIndex(int Index)
+{
+	return ITEMTYPE_EX - Index - 1;
 }
 
 int CDataFileWriter::GetExtendedItemTypeIndex(int Type)
@@ -692,7 +641,7 @@ int CDataFileWriter::AddItem(int Type, int ID, int Size, void *pData)
 	return m_NumItems - 1;
 }
 
-int CDataFileWriter::AddData(int Size, void *pData)
+int CDataFileWriter::AddData(int Size, void *pData, int CompressionLevel)
 {
 	dbg_assert(m_NumDatas < 1024, "too much data");
 
@@ -700,7 +649,7 @@ int CDataFileWriter::AddData(int Size, void *pData)
 	unsigned long s = compressBound(Size);
 	void *pCompData = malloc(s); // temporary buffer that we use during compression
 
-	int Result = compress((Bytef *)pCompData, &s, (Bytef *)pData, Size); // ignore_convention
+	int Result = compress2((Bytef *)pCompData, &s, (Bytef *)pData, Size, CompressionLevel);
 	if(Result != Z_OK)
 	{
 		dbg_msg("datafile", "compression error %d", Result);

@@ -7,7 +7,11 @@
 #include "graphics.h"
 #include "message.h"
 #include <base/hash.h>
+
+#include <game/generated/protocol.h>
+
 #include <engine/friends.h>
+#include <functional>
 
 struct SWarning;
 
@@ -23,42 +27,12 @@ enum
 };
 
 typedef bool (*CLIENTFUNC_FILTER)(const void *pData, int DataSize, void *pUser);
+struct CChecksumData;
 
 class IClient : public IInterface
 {
 	MACRO_INTERFACE("client", 0)
-protected:
-	// quick access to state of the client
-	int m_State;
-
-	// quick access to time variables
-	int m_PrevGameTick[NUM_DUMMIES];
-	int m_CurGameTick[NUM_DUMMIES];
-	float m_GameIntraTick[NUM_DUMMIES];
-	float m_GameTickTime[NUM_DUMMIES];
-
-	int m_PredTick[NUM_DUMMIES];
-	float m_PredIntraTick[NUM_DUMMIES];
-
-	float m_LocalTime;
-	float m_RenderFrameTime;
-
-	int m_GameTickSpeed;
-
-	float m_FrameTimeAvg;
-
 public:
-	char m_aNews[3000];
-	int64 m_ReconnectTime;
-
-	class CSnapItem
-	{
-	public:
-		int m_Type;
-		int m_ID;
-		int m_DataSize;
-	};
-
 	/* Constants: Client States
 		STATE_OFFLINE - The client is offline.
 		STATE_CONNECTING - The client is trying to connect to a server.
@@ -68,7 +42,7 @@ public:
 		STATE_QUITTING - The client is quitting.
 	*/
 
-	enum
+	enum EClientState
 	{
 		STATE_OFFLINE = 0,
 		STATE_CONNECTING,
@@ -79,16 +53,94 @@ public:
 		STATE_RESTARTING,
 	};
 
+	/**
+	* More precise state for @see STATE_LOADING
+	* Sets what is actually happening in the client right now
+	*/
+	enum ELoadingStateDetail
+	{
+		LOADING_STATE_DETAIL_INITIAL,
+		LOADING_STATE_DETAIL_LOADING_MAP,
+		LOADING_STATE_DETAIL_SENDING_READY,
+		LOADING_STATE_DETAIL_GETTING_READY,
+	};
+
+	typedef std::function<void()> TMapLoadingCallbackFunc;
+
+protected:
+	// quick access to state of the client
+	EClientState m_State;
+	ELoadingStateDetail m_LoadingStateDetail;
+	int64_t m_StateStartTime;
+
+	// quick access to time variables
+	int m_aPrevGameTick[NUM_DUMMIES];
+	int m_aCurGameTick[NUM_DUMMIES];
+	float m_aGameIntraTick[NUM_DUMMIES];
+	float m_aGameTickTime[NUM_DUMMIES];
+	float m_aGameIntraTickSincePrev[NUM_DUMMIES];
+
+	int m_aPredTick[NUM_DUMMIES];
+	float m_aPredIntraTick[NUM_DUMMIES];
+
+	float m_LocalTime;
+	float m_RenderFrameTime;
+
+	int m_GameTickSpeed;
+
+	float m_FrameTimeAvg;
+
+	TMapLoadingCallbackFunc m_MapLoadingCBFunc;
+
+public:
+	char m_aNews[3000];
+	char m_aMapDownloadUrl[256];
+	int m_Points;
+	int64_t m_ReconnectTime;
+
+	class CSnapItem
+	{
+	public:
+		int m_Type;
+		int m_ID;
+		int m_DataSize;
+	};
+
+	enum
+	{
+		CONN_MAIN = 0,
+		CONN_DUMMY,
+		CONN_CONTACT,
+		NUM_CONNS,
+	};
+
+	enum
+	{
+		CONNECTIVITY_UNKNOWN,
+		CONNECTIVITY_CHECKING,
+		CONNECTIVITY_UNREACHABLE,
+		CONNECTIVITY_REACHABLE,
+		// Different global IP address has been detected for UDP and
+		// TCP connections.
+		CONNECTIVITY_DIFFERING_UDP_TCP_IP_ADDRESSES,
+	};
+
 	//
-	inline int State() const { return m_State; }
+	inline EClientState State() const { return m_State; }
+	inline ELoadingStateDetail LoadingStateDetail() const { return m_LoadingStateDetail; }
+	inline int64_t StateStartTime() const { return m_StateStartTime; }
+	void SetLoadingStateDetail(ELoadingStateDetail LoadingStateDetail) { m_LoadingStateDetail = LoadingStateDetail; }
+
+	void SetMapLoadingCBFunc(TMapLoadingCallbackFunc &&Func) { m_MapLoadingCBFunc = std::move(Func); }
 
 	// tick time access
-	inline int PrevGameTick(int Dummy) const { return m_PrevGameTick[Dummy]; }
-	inline int GameTick(int Dummy) const { return m_CurGameTick[Dummy]; }
-	inline int PredGameTick(int Dummy) const { return m_PredTick[Dummy]; }
-	inline float IntraGameTick(int Dummy) const { return m_GameIntraTick[Dummy]; }
-	inline float PredIntraGameTick(int Dummy) const { return m_PredIntraTick[Dummy]; }
-	inline float GameTickTime(int Dummy) const { return m_GameTickTime[Dummy]; }
+	inline int PrevGameTick(int Conn) const { return m_aPrevGameTick[Conn]; }
+	inline int GameTick(int Conn) const { return m_aCurGameTick[Conn]; }
+	inline int PredGameTick(int Conn) const { return m_aPredTick[Conn]; }
+	inline float IntraGameTick(int Conn) const { return m_aGameIntraTick[Conn]; }
+	inline float PredIntraGameTick(int Conn) const { return m_aPredIntraTick[Conn]; }
+	inline float IntraGameTickSincePrev(int Conn) const { return m_aGameIntraTickSincePrev[Conn]; }
+	inline float GameTickTime(int Conn) const { return m_aGameTickTime[Conn]; }
 	inline int GameTickSpeed() const { return m_GameTickSpeed; }
 
 	// other time access
@@ -97,7 +149,7 @@ public:
 	inline float FrameTimeAvg() const { return m_FrameTimeAvg; }
 
 	// actions
-	virtual void Connect(const char *pAddress, const char *pPassword = NULL) = 0;
+	virtual void Connect(const char *pAddress, const char *pPassword = nullptr) = 0;
 	virtual void Disconnect() = 0;
 
 	// dummy
@@ -105,6 +157,7 @@ public:
 	virtual void DummyConnect() = 0;
 	virtual bool DummyConnected() = 0;
 	virtual bool DummyConnecting() = 0;
+	virtual bool DummyAllowed() = 0;
 
 	virtual void Restart() = 0;
 	virtual void Quit() = 0;
@@ -123,32 +176,35 @@ public:
 
 	// gfx
 	virtual void SwitchWindowScreen(int Index) = 0;
-	virtual void ToggleFullscreen() = 0;
-	virtual void ToggleWindowBordered() = 0;
+	virtual void SetWindowParams(int FullscreenMode, bool IsBorderless, bool AllowResizing) = 0;
 	virtual void ToggleWindowVSync() = 0;
 	virtual void LoadFont() = 0;
 	virtual void Notify(const char *pTitle, const char *pMessage) = 0;
 
+	virtual void UpdateAndSwap() = 0;
+
 	// networking
-	virtual void EnterGame() = 0;
+	virtual void EnterGame(int Conn) = 0;
 
 	//
-	virtual const char *MapDownloadName() = 0;
-	virtual int MapDownloadAmount() = 0;
-	virtual int MapDownloadTotalsize() = 0;
+	virtual const NETADDR &ServerAddress() const = 0;
+	virtual int ConnectNetTypes() const = 0;
+	virtual const char *ConnectAddressString() const = 0;
+	virtual const char *MapDownloadName() const = 0;
+	virtual int MapDownloadAmount() const = 0;
+	virtual int MapDownloadTotalsize() const = 0;
 
 	// input
-	virtual int *GetInput(int Tick, int IsDummy = 0) = 0;
-	virtual int *GetDirectInput(int Tick, int IsDummy = 0) = 0;
+	virtual int *GetInput(int Tick, int IsDummy = 0) const = 0;
 
 	// remote console
 	virtual void RconAuth(const char *pUsername, const char *pPassword) = 0;
-	virtual bool RconAuthed() = 0;
-	virtual bool UseTempRconCommands() = 0;
+	virtual bool RconAuthed() const = 0;
+	virtual bool UseTempRconCommands() const = 0;
 	virtual void Rcon(const char *pLine) = 0;
 
 	// server info
-	virtual void GetServerInfo(class CServerInfo *pServerInfo) = 0;
+	virtual void GetServerInfo(class CServerInfo *pServerInfo) const = 0;
 
 	virtual int GetPredictionTime() = 0;
 
@@ -157,47 +213,48 @@ public:
 	enum
 	{
 		SNAP_CURRENT = 0,
-		SNAP_PREV = 1
+		SNAP_PREV = 1,
+		NUM_SNAPSHOT_TYPES = 2,
 	};
 
 	// TODO: Refactor: should redo this a bit i think, too many virtual calls
-	virtual int SnapNumItems(int SnapID) = 0;
-	virtual void *SnapFindItem(int SnapID, int Type, int ID) = 0;
-	virtual void *SnapGetItem(int SnapID, int Index, CSnapItem *pItem) = 0;
-	virtual int SnapItemSize(int SnapID, int Index) = 0;
+	virtual int SnapNumItems(int SnapID) const = 0;
+	virtual void *SnapFindItem(int SnapID, int Type, int ID) const = 0;
+	virtual void *SnapGetItem(int SnapID, int Index, CSnapItem *pItem) const = 0;
+	virtual int SnapItemSize(int SnapID, int Index) const = 0;
 	virtual void SnapInvalidateItem(int SnapID, int Index) = 0;
 
 	virtual void SnapSetStaticsize(int ItemType, int Size) = 0;
 
-	virtual int SendMsg(CMsgPacker *pMsg, int Flags) = 0;
-	virtual int SendMsgY(CMsgPacker *pMsg, int Flags, int NetClient = 1) = 0;
+	virtual int SendMsg(int Conn, CMsgPacker *pMsg, int Flags) = 0;
+	virtual int SendMsgActive(CMsgPacker *pMsg, int Flags) = 0;
 
 	template<class T>
-	int SendPackMsg(T *pMsg, int Flags)
+	int SendPackMsgActive(T *pMsg, int Flags)
 	{
 		CMsgPacker Packer(pMsg->MsgID(), false);
 		if(pMsg->Pack(&Packer))
 			return -1;
-		return SendMsg(&Packer, Flags);
+		return SendMsgActive(&Packer, Flags);
 	}
 
 	//
-	virtual const char *PlayerName() = 0;
-	virtual const char *DummyName() = 0;
-	virtual const char *ErrorString() = 0;
-	virtual const char *LatestVersion() = 0;
-	virtual bool ConnectionProblems() = 0;
+	virtual const char *PlayerName() const = 0;
+	virtual const char *DummyName() const = 0;
+	virtual const char *ErrorString() const = 0;
+	virtual const char *LatestVersion() const = 0;
+	virtual bool ConnectionProblems() const = 0;
 
-	virtual bool SoundInitFailed() = 0;
+	virtual bool SoundInitFailed() const = 0;
 
-	virtual IGraphics::CTextureHandle GetDebugFont() = 0; // TODO: remove this function
+	virtual IGraphics::CTextureHandle GetDebugFont() const = 0; // TODO: remove this function
 
 	//DDRace
 
-	virtual const char *GetCurrentMap() = 0;
-	virtual const char *GetCurrentMapPath() = 0;
-	virtual SHA256_DIGEST GetCurrentMapSha256() = 0;
-	virtual unsigned GetCurrentMapCrc() = 0;
+	virtual const char *GetCurrentMap() const = 0;
+	virtual const char *GetCurrentMapPath() const = 0;
+	virtual SHA256_DIGEST GetCurrentMapSha256() const = 0;
+	virtual unsigned GetCurrentMapCrc() const = 0;
 
 	virtual int GetCurrentRaceTime() = 0;
 
@@ -210,7 +267,7 @@ public:
 	virtual void DemoSlice(const char *pDstPath, CLIENTFUNC_FILTER pfnFilter, void *pUser) = 0;
 
 	virtual void RequestDDNetInfo() = 0;
-	virtual bool EditorHasUnsavedData() = 0;
+	virtual bool EditorHasUnsavedData() const = 0;
 
 	virtual void GenerateTimeoutSeed() = 0;
 
@@ -219,6 +276,9 @@ public:
 	virtual void GetSmoothTick(int *pSmoothTick, float *pSmoothIntraTick, float MixAmount) = 0;
 
 	virtual SWarning *GetCurWarning() = 0;
+	virtual CChecksumData *ChecksumData() = 0;
+	virtual bool InfoTaskRunning() = 0;
+	virtual int UdpConnectivity(int NetType) = 0;
 };
 
 class IGameClient : public IInterface
@@ -239,7 +299,7 @@ public:
 	virtual void OnUpdate() = 0;
 	virtual void OnStateChange(int NewState, int OldState) = 0;
 	virtual void OnConnected() = 0;
-	virtual void OnMessage(int MsgID, CUnpacker *pUnpacker, bool IsDummy = 0) = 0;
+	virtual void OnMessage(int MsgID, CUnpacker *pUnpacker, int Conn, bool Dummy) = 0;
 	virtual void OnPredict() = 0;
 	virtual void OnActivateEditor() = 0;
 
@@ -248,17 +308,22 @@ public:
 	virtual void SendDummyInfo(bool Start) = 0;
 	virtual int GetLastRaceTick() = 0;
 
-	virtual const char *GetItemName(int Type) = 0;
-	virtual const char *Version() = 0;
-	virtual const char *NetVersion() = 0;
-	virtual int DDNetVersion() = 0;
-	virtual const char *DDNetVersionStr() = 0;
+	virtual const char *GetItemName(int Type) const = 0;
+	virtual const char *Version() const = 0;
+	virtual const char *NetVersion() const = 0;
+	virtual int DDNetVersion() const = 0;
+	virtual const char *DDNetVersionStr() const = 0;
 
 	virtual void OnDummyDisconnect() = 0;
+	virtual void DummyResetInput() = 0;
 	virtual void Echo(const char *pString) = 0;
 	virtual bool CanDisplayWarning() = 0;
 	virtual bool IsDisplayingWarning() = 0;
+
+	virtual CNetObjHandler *GetNetObjHandler() = 0;
 };
+
+void SnapshotRemoveExtraProjectileInfo(unsigned char *pData);
 
 extern IGameClient *CreateGameClient();
 #endif

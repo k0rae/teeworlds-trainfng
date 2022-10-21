@@ -1,5 +1,9 @@
 ##### language indices #####
 
+arabic
+== ﻲﺑﺮﻋ
+== 682
+
 belarusian
 == Беларуская
 == 112
@@ -20,6 +24,10 @@ catalan
 == Català
 == 906
 
+chuvash
+== Чăвашла
+== 643
+
 czech
 == Česky
 == 203
@@ -32,6 +40,10 @@ dutch
 == Nederlands
 == 528
 
+esperanto
+== Esperanto
+== -1
+
 finnish
 == Suomi
 == 246
@@ -43,6 +55,10 @@ french
 german
 == Deutsch
 == 276
+
+greek
+== Ελληνικά
+== 300
 
 hungarian
 == Magyar

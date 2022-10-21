@@ -8,9 +8,7 @@
 
 int main(int argc, const char **argv)
 {
-	dbg_logger_stdout();
-
-	IStorage *pStorage = CreateStorage("Teeworlds", IStorage::STORAGETYPE_BASIC, argc, argv);
+	IStorage *pStorage = CreateStorage(IStorage::STORAGETYPE_BASIC, argc, argv);
 	int Index, ID = 0, Type = 0, Size;
 	void *pPtr;
 	char aFileName[1024];
@@ -57,7 +55,7 @@ int main(int argc, const char **argv)
 					{
 						for(int x = 0; x < pTilemap->m_Width; x++)
 						{
-							int Index = pTiles[y * pTilemap->m_Width + x].m_Index;
+							Index = pTiles[y * pTilemap->m_Width + x].m_Index;
 							if(Index >= 208 && Index <= 210)
 							{
 								dbg_msg("map_update_fng", " - old index changed (%i)", pTiles[y * pTilemap->m_Width + x].m_Index);

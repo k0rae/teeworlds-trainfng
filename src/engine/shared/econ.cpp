@@ -4,6 +4,11 @@
 #include "econ.h"
 #include "netban.h"
 
+CEcon::CEcon() :
+	m_Ready(false)
+{
+}
+
 int CEcon::NewClientCallback(int ClientID, void *pUser)
 {
 	CEcon *pThis = (CEcon *)pUser;
@@ -36,21 +41,6 @@ int CEcon::DelClientCallback(int ClientID, const char *pReason, void *pUser)
 	return 0;
 }
 
-void CEcon::SendLineCB(const char *pLine, void *pUserData, bool Highlighted)
-{
-	static_cast<CEcon *>(pUserData)->Send(-1, pLine);
-}
-
-void CEcon::ConchainEconOutputLevelUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
-{
-	pfnCallback(pResult, pCallbackUserData);
-	if(pResult->NumArguments() == 1)
-	{
-		CEcon *pThis = static_cast<CEcon *>(pUserData);
-		pThis->Console()->SetPrintOutputLevel(pThis->m_PrintCBIndex, pResult->GetInteger(0));
-	}
-}
-
 void CEcon::ConLogout(IConsole::IResult *pResult, void *pUserData)
 {
 	CEcon *pThis = static_cast<CEcon *>(pUserData);
@@ -59,12 +49,13 @@ void CEcon::ConLogout(IConsole::IResult *pResult, void *pUserData)
 		pThis->m_NetConsole.Drop(pThis->m_UserClientID, "Logout");
 }
 
-void CEcon::Init(IConsole *pConsole, CNetBan *pNetBan)
+void CEcon::Init(CConfig *pConfig, IConsole *pConsole, CNetBan *pNetBan)
 {
+	m_pConfig = pConfig;
 	m_pConsole = pConsole;
 
-	for(int i = 0; i < NET_MAX_CONSOLE_CLIENTS; i++)
-		m_aClients[i].m_State = CClient::STATE_EMPTY;
+	for(auto &Client : m_aClients)
+		Client.m_State = CClient::STATE_EMPTY;
 
 	m_Ready = false;
 	m_UserClientID = -1;
@@ -86,17 +77,13 @@ void CEcon::Init(IConsole *pConsole, CNetBan *pNetBan)
 		BindAddr.port = g_Config.m_EcPort;
 	}
 
-	if(m_NetConsole.Open(BindAddr, pNetBan, 0))
+	if(m_NetConsole.Open(BindAddr, pNetBan))
 	{
 		m_NetConsole.SetCallbacks(NewClientCallback, DelClientCallback, this);
 		m_Ready = true;
 		char aBuf[128];
 		str_format(aBuf, sizeof(aBuf), "bound to %s:%d", g_Config.m_EcBindaddr, g_Config.m_EcPort);
 		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "econ", aBuf);
-
-		Console()->Chain("ec_output_level", ConchainEconOutputLevelUpdate, this);
-		m_PrintCBIndex = Console()->RegisterPrintCallback(g_Config.m_EcOutputLevel, SendLineCB, this);
-
 		Console()->Register("logout", "", CFGFLAG_ECON, ConLogout, this, "Logout of econ");
 	}
 	else

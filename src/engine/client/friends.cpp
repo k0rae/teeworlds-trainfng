@@ -38,9 +38,9 @@ void CFriends::Init(bool Foes)
 {
 	m_Foes = Foes;
 
-	IConfig *pConfig = Kernel()->RequestInterface<IConfig>();
-	if(pConfig)
-		pConfig->RegisterCallback(ConfigSaveCallback, this);
+	IConfigManager *pConfigManager = Kernel()->RequestInterface<IConfigManager>();
+	if(pConfigManager)
+		pConfigManager->RegisterCallback(ConfigSaveCallback, this);
 
 	IConsole *pConsole = Kernel()->RequestInterface<IConsole>();
 	if(pConsole)
@@ -113,8 +113,8 @@ void CFriends::AddFriend(const char *pName, const char *pClan)
 			return;
 	}
 
-	str_copy(m_aFriends[m_NumFriends].m_aName, pName, sizeof(m_aFriends[m_NumFriends].m_aName));
-	str_copy(m_aFriends[m_NumFriends].m_aClan, pClan, sizeof(m_aFriends[m_NumFriends].m_aClan));
+	str_copy(m_aFriends[m_NumFriends].m_aName, pName);
+	str_copy(m_aFriends[m_NumFriends].m_aClan, pClan);
 	m_aFriends[m_NumFriends].m_NameHash = NameHash;
 	m_aFriends[m_NumFriends].m_ClanHash = ClanHash;
 	++m_NumFriends;
@@ -153,19 +153,20 @@ void CFriends::Friends()
 		for(int i = 0; i < m_NumFriends; ++i)
 		{
 			str_format(aBuf, sizeof(aBuf), "Name: %s, Clan: %s", m_aFriends[i].m_aName, m_aFriends[i].m_aClan);
-			pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, m_Foes ? "foes" : "friends", aBuf, true);
+
+			pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, m_Foes ? "foes" : "friends", aBuf, color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageHighlightColor)));
 		}
 	}
 }
 
-void CFriends::ConfigSaveCallback(IConfig *pConfig, void *pUserData)
+void CFriends::ConfigSaveCallback(IConfigManager *pConfigManager, void *pUserData)
 {
 	CFriends *pSelf = (CFriends *)pUserData;
 	char aBuf[128];
 	const char *pEnd = aBuf + sizeof(aBuf) - 4;
 	for(int i = 0; i < pSelf->m_NumFriends; ++i)
 	{
-		str_copy(aBuf, pSelf->m_Foes ? "add_foe " : "add_friend ", sizeof(aBuf));
+		str_copy(aBuf, pSelf->m_Foes ? "add_foe " : "add_friend ");
 
 		str_append(aBuf, "\"", sizeof(aBuf));
 		char *pDst = aBuf + str_length(aBuf);
@@ -175,6 +176,6 @@ void CFriends::ConfigSaveCallback(IConfig *pConfig, void *pUserData)
 		str_escape(&pDst, pSelf->m_aFriends[i].m_aClan, pEnd);
 		str_append(aBuf, "\"", sizeof(aBuf));
 
-		pConfig->WriteLine(aBuf);
+		pConfigManager->WriteLine(aBuf);
 	}
 }

@@ -2,8 +2,8 @@
 #ifndef BASE_COLOR_H
 #define BASE_COLOR_H
 
-#include "math.h"
-#include "vmath.h"
+#include <base/math.h>
+#include <base/vmath.h>
 
 /*
 	Title: Color handling
@@ -54,7 +54,10 @@ public:
 		float w, a;
 	};
 
-	color4_base() {}
+	color4_base() :
+		x(), y(), z(), a()
+	{
+	}
 
 	color4_base(const vec4 &v4)
 	{
@@ -96,7 +99,15 @@ public:
 		z = ((col >> 0) & 0xFF) / 255.0f;
 	}
 
-	vec4 v4() { return vec4(x, y, z, a); };
+	vec4 v4() const { return vec4(x, y, z, a); }
+	operator vec4() const { return vec4(x, y, z, a); }
+	float &operator[](int index)
+	{
+		return ((float *)this)[index];
+	}
+
+	bool operator==(const color4_base &col) const { return x == col.x && y == col.y && z == col.z && a == col.a; }
+	bool operator!=(const color4_base &col) const { return x != col.x || y != col.y || z != col.z || a != col.a; }
 
 	unsigned Pack(bool Alpha = true)
 	{
@@ -155,7 +166,7 @@ public:
 };
 
 template<typename T, typename F>
-T color_cast(const F &f) = delete;
+T color_cast(const F &) = delete;
 
 template<>
 inline ColorHSLA color_cast(const ColorRGBA &rgb)
@@ -177,29 +188,35 @@ inline ColorRGBA color_cast(const ColorHSLA &hsl)
 	vec3 rgb = vec3(0, 0, 0);
 
 	float h1 = hsl.h * 6;
-	float c = (1 - absolute(2 * hsl.l - 1)) * hsl.s;
-	float x = c * (1 - absolute(fmod(h1, 2) - 1));
+	float c = (1.f - absolute(2 * hsl.l - 1)) * hsl.s;
+	float x = c * (1.f - absolute(fmodf(h1, 2) - 1.f));
 
 	switch(round_truncate(h1))
 	{
 	case 0:
-		rgb.r = c, rgb.g = x;
+		rgb.r = c;
+		rgb.g = x;
 		break;
 	case 1:
-		rgb.r = x, rgb.g = c;
+		rgb.r = x;
+		rgb.g = c;
 		break;
 	case 2:
-		rgb.g = c, rgb.b = x;
+		rgb.g = c;
+		rgb.b = x;
 		break;
 	case 3:
-		rgb.g = x, rgb.b = c;
+		rgb.g = x;
+		rgb.b = c;
 		break;
 	case 4:
-		rgb.r = x, rgb.b = c;
+		rgb.r = x;
+		rgb.b = c;
 		break;
 	case 5:
 	case 6:
-		rgb.r = c, rgb.b = x;
+		rgb.r = c;
+		rgb.b = x;
 		break;
 	}
 

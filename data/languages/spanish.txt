@@ -9,6 +9,14 @@
 #	Mortcheck		2012-11-03 22:58:43
 #	FeaRZ		2020-07-07 12:09:00
 #	Ryozuki         2020-07-09 12:06:00
+# Headshot        2020-11-07 12:40:00
+# Headshot        2021-05-30 17:00:00
+# Deëivid!        2021-10-27 00:49:00
+# Deëivid!        2022-02-05 21:53:00
+# Deëivid!        2022-03-27 18:40:00
+# Deëivid!        2022-05-13 18:44:00
+# Deëivid!        2022-06-22 19:26:00
+# Deëivid!        2022-07-05 22:30:00
 ##### /authors #####
 
 ##### translated strings #####
@@ -80,7 +88,7 @@ Change settings
 == Cambiar configuración
 
 Chat
-== Conversación
+== Chat
 
 Clan
 == Clan
@@ -90,9 +98,6 @@ Client
 
 Close
 == Cerrar
-
-Compatible version
-== Versión compatible
 
 Connect
 == Conectar
@@ -150,9 +155,6 @@ Dynamic Camera
 
 Emoticon
 == Emoticon
-
-Enter
-== Entrar
 
 Error
 == Error
@@ -224,7 +226,7 @@ Has people playing
 == Hay gente jugando
 
 High Detail
-== Mas detalles (HD)
+== Más detalles (HD)
 
 Hook
 == Gancho
@@ -233,10 +235,10 @@ Invalid Demo
 == Demo inválida
 
 Join blue
-== Unirse a azul
+== Unirse al azul
 
 Join red
-== Unirse a rojo
+== Unirse al rojo
 
 Jump
 == Saltar
@@ -252,12 +254,6 @@ MOTD
 
 Map
 == Mapa
-
-Maximum ping:
-== Ping máximo:
-
-Mouse sens.
-== Sensibilidad ratón
 
 Move left
 == Mover a la izquierda
@@ -356,9 +352,6 @@ Red team wins!
 Refresh
 == Actualizar
 
-Refreshing master servers
-== Actualizando servidores maestros
-
 Remote console
 == Consola remota
 
@@ -423,10 +416,7 @@ Show name plates
 == Mostrar apodos
 
 Show only chat messages from friends
-== Recibir mensages solo de amigos
-
-Show only supported
-== Mostrar únicamente modos soportados
+== Recibir mensajes solo de amigos
 
 Skins
 == Skins
@@ -456,7 +446,7 @@ Stop record
 == Detener grabación
 
 Strict gametype filter
-== Tipo de juego del filtro
+== Filtro de tipo de juego estricto
 
 Sudden Death
 == Muerte súbita
@@ -471,7 +461,7 @@ Team chat
 == En equipo
 
 The audio device couldn't be initialised.
-== El dispositivo de audio no puede ser inicializado.
+== El dispositivo de audio no pudo ser inicializado.
 
 The server is running a non-standard tuning on a pure game type.
 == El servidor está ejecutando una configuración no estándar en un tipo de juego puro.
@@ -563,7 +553,7 @@ FSAA samples
 == Muestras FSAA
 
 Sound volume
-== Volumen de sonido
+== Volumen del sonido
 
 Created:
 == Creado:
@@ -599,7 +589,7 @@ Size:
 == Tamaño:
 
 Reset to defaults
-== Resetar por defecto
+== Resetear por defecto
 
 Quit anyway?
 == ¿Salir de todos modos?
@@ -614,7 +604,7 @@ Round
 == Ronda
 
 Lht.
-== Luminosidad
+== Lum.
 
 UI Color
 == Color de menú
@@ -623,7 +613,7 @@ Crc:
 == Crc:
 
 Alpha
-== Alpha
+== Transp.
 
 LAN
 == LAN
@@ -685,22 +675,10 @@ Welcome to DDNet
 DDraceNetwork is a cooperative online game where the goal is for you and your group of tees to reach the finish line of the map. As a newcomer you should start on Novice servers, which host the easiest maps. Consider the ping to choose a server close to you.
 == DDraceNetwork es un juego cooperativo en línea donde el objetivo es que tú y vuestro grupo de tees lleguen a la meta del mapa. Como recién llegado, deberías comenzar en los servidores Novice, que alojan los mapas más fáciles. Considera el ping para elegir un servidor cercano.
 
-The maps contain freeze, which temporarily make a tee unable to move. You have to work together to get through these parts.
-== Los mapas contienen freeze, lo que hace que a un tee no pueda moverse temporalmente. Tendrán que trabajar juntos para superar estas partes.
-
-The mouse wheel changes weapons. Hammer (left mouse) can be used to hit other tees and wake them up from being frozen.
-== La rueda del ratón cambia las armas. El martillo (ratón izquierdo) se puede usar para golpear otros tees y despertarlos del freeze.
-
-Hook (right mouse) can be used to swing through the map and to hook other tees to you.
-== El gancho (mouse derecho) se puede usar para desplazarse por el mapa y enganchar a  otros tees hacia ti.
-
-Most importantly communication is key: There is no tutorial so you'll have to chat (t key) with other players to learn the basics and tricks of the game.
-== Lo más importante es que la comunicación es clave: no hay un tutorial, por lo que tendrás que chatear (tecla t) con otros jugadores para aprender los conceptos básicos y las técnicas del juego.
-
 It's recommended that you check the settings to adjust them to your liking before joining a server.
 == Se recomienda que verifiques la configuración para ajustarla a tu gusto antes de unirte a un servidor.
 
-Please enter your nick name below.
+Please enter your nickname below.
 == Por favor, introduzca su apodo a continuación.
 
 Destination file already exist
@@ -785,7 +763,7 @@ Date
 == Fecha
 
 Fetch Info
-== Obtener información
+== Obtener info.
 
 Render
 == Renderizar
@@ -811,9 +789,6 @@ Save
 Switch weapon when out of ammo
 == Cambiar de arma cuando se acabe la munición
 
-Reset wanted weapon on death
-== Restablecer el arma deseada al morir
-
 Show clan above name plates
 == Mostrar el clan por encima de los nombres
 
@@ -822,9 +797,6 @@ Clan plates size
 
 Refresh Rate
 == Frecuencia de actualización
-
-Show console window
-== Mostrar ventana de consola
 
 Automatically take statboard screenshot
 == Tomar automáticamente la captura de pantalla del Statboard
@@ -836,7 +808,7 @@ Max CSVs
 == CSV máx
 
 Dummy settings
-== Configuración del Dummy
+== Config. del Dummy
 
 Vanilla skins only
 == Solo skins Vanilla
@@ -863,7 +835,7 @@ Zoom out
 == Alejar
 
 Default zoom
-== Zoom predeterminado
+== Zoom predeterm.
 
 Show others
 == Mostrar otros
@@ -872,7 +844,7 @@ Show all
 == Mostrar todo
 
 Toggle dyncam
-== Alternar cámara dinámica
+== Alt. cámara dinámica
 
 Toggle dummy
 == Alternar dummy
@@ -901,26 +873,11 @@ Show entities
 Show HUD
 == Mostrar HUD
 
-UI mouse s.
-== UI mouse s.
-
-Borderless window
-== Ventana sin bordes
-
 may cause delay
 == puede causar retraso
 
 Screen
 == Pantalla
-
-Use OpenGL 3.3 (experimental)
-== Usar OpenGL 3.3 (experimental)
-
-Preinit VBO (iGPUs only)
-== Preinit VBO (solo iGPU)
-
-Multiple texture units (disable for MacOS)
-== Múltiples unidades de textura (deshabilitar para MacOS)
 
 Use high DPI
 == Usar DPI alto
@@ -932,7 +889,7 @@ Enable gun sound
 == Habilitar sonido de pistola
 
 Enable long pain sound (used when shooting in freeze)
-== Habilitar el sonido de dolor prolongado (se usa al disparar al estar congelado)
+== Habilitar el sonido de dolor prolongado (se usa al disparar estando congelado)
 
 Enable server message sound
 == Habilitar el sonido para mensajes del servidor
@@ -950,7 +907,7 @@ Threaded sound loading
 == Carga de sonido en un hilo
 
 Map sound volume
-== Volumen de sonido del mapa
+== Vol. del sonido del mapa
 
 HUD
 == Apariencia
@@ -964,17 +921,11 @@ DDNet Client needs to be restarted to complete update!
 Use DDRace Scoreboard
 == Utiliza el marcador DDRace
 
-Show client IDs in Scoreboard
-== Mostrar IDs de clientes en el marcador
-
 Show score
 == Mostrar puntaje
 
-Show health + ammo
-== Mostrar salud + munición
-
 Show names in chat in team colors
-== Mostrar nombres en el chat en colores del equipo
+== Mostrar nombres con colores de equipo en el chat
 
 Show kill messages
 == Mostrar mensajes de muerte
@@ -994,47 +945,14 @@ Reset
 Highlighted message
 == Mensaje resaltado
 
-Spectator
-== Espectador
-
-Look out!
-== ¡Ten cuidado!
-
 Team message
 == Mensaje del equipo
-
-We will win
-== Nosotros ganaremos
 
 Friend message
 == Mensaje de un amigo
 
-Friend
-== Amigo
-
-Hi o/
-== Hola o/
-
 Normal message
 == Mensaje normal
-
-Hello and welcome
-== Hola y bienvenido
-
-Inner color
-== Color interior
-
-Outline color
-== Color de contorno
-
-Wait before try for
-== Espera antes de intentar
-
-second
-== segundo
-
-seconds
-== segundos
 
 Save the best demo of each race
 == Guardar la mejor demo de cada carrera
@@ -1073,13 +991,13 @@ AntiPing
 == AntiPing
 
 AntiPing: predict other players
-== AntiPing: predice otros jugadores
+== AntiPing: predecir otros jugadores
 
 AntiPing: predict weapons
-== AntiPing: predice armas
+== AntiPing: predecir armas
 
 AntiPing: predict grenade paths
-== AntiPing: predice recorrido de granadas
+== AntiPing: predecir recorrido de granadas
 
 Show other players' hook collision lines
 == Mostrar las líneas de colisión de gancho de otros jugadores
@@ -1090,17 +1008,11 @@ Show other players' key presses
 Old mouse mode
 == Modo de mouse viejo
 
-Background (regular)
-== Fondo (regular)
-
-Background (entities)
-== Fondo (entidades)
-
 Show tiles layers from BG map
-== Mostrar capas de tiles del mapa BG
+== Mostrar capas de tiles del mapa de fondo
 
 Try fast HTTP map download first
-== Prueba primero la descarga rápida del mapa HTTP
+== Intentar primero la descarga rápida de HTTP para mapas
 
 DDNet %s is available:
 == DDNet %s está disponible:
@@ -1112,7 +1024,7 @@ No updates available
 == No hay actualizaciones disponibles
 
 Check now
-== Revisar ahora
+== Chequear
 
 New random timeout code
 == Nuevo código de timeout aleatorio
@@ -1120,23 +1032,11 @@ New random timeout code
 Time
 == Tiempo
 
-Manual %3d:%02d  
-== Manual %3d:%02d  
-
-Race %3d:%02d  
-== Carrera %3d:%02d 
-
-Auto %3d:%02d  
-== Auto %3d:%02d
-
-Replay %3d:%02d  
-== Repetición %3d:%02d
-
 Follow
 == Seguir
 
 Frags
-== Muertes del enemigo
+== Asesinatos
 
 Deaths
 == Muertes
@@ -1145,13 +1045,13 @@ Suicides
 == Suicidios
 
 Ratio
-== Proporción
+== K/D
 
 Net
-== Net
+== Ventaja
 
 FPM
-== Modo de página rápida
+== APM
 
 Spree
 == Racha
@@ -1160,7 +1060,7 @@ Best
 == Mejor
 
 Grabs
-== Agarrar
+== Banderas
 
 1 new mention
 == 1 nueva mención
@@ -1171,108 +1071,503 @@ Grabs
 9+ new mentions
 == 9+ nuevas menciones
 
-Downloading ddnet-info.json failed
-== 
-
 Saving ddnet-settings.cfg failed
-== 
-
-The width or height of texture %s is not divisible by 16, which might cause visual bugs.
-== 
+== Error al guardar ddnet-settings.cfg
 
 Warning
-== 
+== Advertencia
+
+Debug mode enabled. Press Ctrl+Shift+D to disable debug mode.
+== Modo debug activado. Pulsa Ctrl+Shift+D para desactivar.
 
 Use k key to kill (restart), q to pause and watch other players. See settings for other key binds.
-== 
+== Usa la tecla K para suicidarte (reiniciar), Q para pausar y ver a otros jugadores. Mira la configuración para otras teclas.
+
+Existing Player
+== Este jugador ya existe
+
+Your nickname '%s' is already used (%d points). Do you still want to use it?
+== Tu nombre '%s' ya está usado (%d puntos). ¿Deseas seguir usándolo?
+
+Checking for existing player with your name
+== Comprobando si ya existe un jugador con tu nombre
 
 Country / Region
-== 
+== País / Región
 
 Speed
-== 
+== Velocidad
 
 Theme
-== 
+== Tema
 
 %d of %d servers
-== 
+== %d de %d servidores
 
 %d of %d server
-== 
+== %d de %d servidor
 
 %d players
-== 
+== %d jugadores
 
 %d player
-== 
-
-File
-== 
+== %d jugador
 
 Demos directory
-== 
+== Directorio de demos
+
+Smooth Dynamic Camera
+== Cámara dinámica suave
 
 Skip the main menu
-== 
+== Saltar el menú principal
 
 Themes directory
-== 
+== Directorio de temas
 
 Download skins
-== 
+== Descargar skins
 
 Skin Database
-== 
+== Base de datos de skins
 
 Skins directory
-== 
+== Directorio de skins
+
+Game sound volume
+== Vol. del sonido del juego
+
+Chat sound volume
+== Vol. del sonido del chat
 
 Background music volume
-== 
+== Vol. de la música de fondo
 
 Assets
-== 
+== Recursos
+
+Use old chat style
+== Usar estilo antiguo del chat
 
 Client message
-== 
+== Mensaje de cliente
 
 Use current map as background
-== 
+== Usar mapa actual como fondo
 
 Entities
-== 
+== Entidades
 
 Emoticons
-== 
+== Emoticones
 
 Particles
-== 
+== Partículas
 
 Assets directory
-== 
+== Directorio de recursos
 
 https://wiki.ddnet.tw/
-== 
+== https://wiki.ddnet.tw/
 
 Website
-== 
+== Página web
 
 Settings
-== 
+== Configuración
 
 Stop server
-== 
+== Detener servidor
 
 Run server
-== 
+== Iniciar servidor
 
 Server executable not found, can't run server
-== 
+== Ejecutable del servidor no encontrado. No se puede iniciar el servidor
 
 Editor
-== 
+== Editor
 
 [Start menu]
 Play
+== Jugar
+
+Manual
+== Manual
+
+Race
+== Carrera
+
+Auto
+== Auto
+
+Replay
+== Repetición
+
+The width of texture %s is not divisible by %d, or the height is not divisible by %d, which might cause visual bugs.
+== El ancho de la textura %s no es divisible por %d, o el alto no es divisible por %d, lo que puede causar errores visuales.
+
+AFR
+== AFR
+
+ASI
+== ASI
+
+AUS
+== AUS
+
+EUR
+== EUR
+
+NA
+== NA
+
+SA
+== SA
+
+CHN
+== CHN
+
+Getting server list from master server
+== Obteniendo lista de servidores del servidor maestro
+
+Leak IP
+== Filtrar tu IP
+
+Chat command
+== Comando de chat
+
+Dummy
+== Dummy
+
+Windowed
+== En ventana
+
+Windowed borderless
+== Ventana sin bordes
+
+Desktop fullscreen
+== Pantalla completa de escritorio
+
+Laser Outline Color
+== Color de contorno del láser
+
+Laser Inner Color
+== Color interior del láser
+
+Preview
+== Vista previa
+
+Background
+== Fondo
+
+Entities Background color
+== Color de fondo de entidades
+
+Regular Background Color
+== Color de fondo regular
+
+Discord
+== Discord
+
+https://ddnet.tw/discord
+== https://ddnet.tw/discord
+
+Are you sure that you want to disconnect and switch to a different server?
+== ¿Seguro que quieres desconectarte y cambiar de servidor?
+
+Refreshing...
+== Actualizando...
+
+Kill Messages
+== Mensajes de Muerte
+
+Show local player's key presses
+== Mostrar las teclas presionadas por el jugador local
+
+Settings file
+== Archivo de configuraciones
+
+Config directory
+== Directorio de configuración
+
+Run on join
+== Ejec. al entrar
+
+Chat command (e.g. showall 1)
+== Comando de chat (Ej. showall 1)
+
+The format of texture %s is not RGBA which will cause visual bugs.
+== El formato de la textura %s no es RGBA, lo que puede causar errores visuales.
+
+Join Tutorial Server
+== Ir a un servidor Tutorial
+
+Skip Tutorial
+== Saltar Tutorial
+
+Windowed fullscreen
+== Ventana a pantalla completa
+
+Renderer
+== Renderizador
+
+default
+== por defecto
+
+custom
+== personalizado
+
+Graphics cards
+== Tarjetas de video
+
+auto
+== auto.
+
+Tutorial
+== Tutorial
+
+Can't find a Tutorial server
+== No se pudo encontrar un servidor Tutorial
+
+Toggle to edit your dummy settings
+== Actívalo para editar la configuración de tu dummy
+
+Choose default eyes when joining a server
+== Escoge los ojos predeterminados al unirte a un servidor
+
+Allows maps to render with more detail
+== Permite que los mapas tengan más detalles
+
+When you cross the start line, show a ghost tee replicating the movements of your best time
+== Cuando cruzas la línea de inicio, se muestra un tee fantasma replicando los movimientos de tu mejor tiempo
+
+Opacity
+== Opacidad
+
+Quads are used for background decoration
+== Las quads se usan para la decoración del fondo
+
+Tries to predict other entities to give a feel of low latency
+== Intenta predecir a otras entidades para dar una sensación de baja latencia
+
+Super
+== Súper
+
+Team %d
+== Equipo %d
+
+Position:
+== Posición:
+
+Speed:
+== Velocidad:
+
+Angle:
+== Ángulo:
+
+Trying to determine UDP connectivity...
+== Tratando de determinar la conexión UDP...
+
+UDP seems to be filtered.
+== UDP parece estar filtrado.
+
+UDP and TCP IP addresses seem to be different. Try disabling VPN, proxy or network accelerators.
+== Las direcciones IP TCP y UDP parecen ser diferentes. Intenta desactivar cualquier VPN, proxy o acelerador de red.
+
+No answer from server yet.
+== Aún no hay respuesta del servidor.
+
+Download community skins
+== Descargar skins de la comunidad
+
+Enable controller
+== Habilitar mando
+
+Controller %d: %s
+== Mando %d: %s
+
+Click to cycle through all available controllers.
+== Click acá para recorrer todos los mandos disponibles.
+
+[Ingame controller mode]
+Relative
+== Relativo
+
+[Ingame controller mode]
+Absolute
+== Absoluto
+
+Ingame controller mode
+== Modo del mando
+
+Ingame controller sens.
+== Sens. del mando en el juego
+
+UI controller sens.
+== Sens. del mando en el menú
+
+Controller jitter tolerance
+== Tolerancia a la fluctuación del mando
+
+No controller found. Plug in a controller and restart the game.
+== No se encontró un mando. Conecta uno y reinicia el juego.
+
+Device
+== Dispositivo
+
+Status
+== Estado
+
+Aim bind
+== Apuntar
+
+Controller Axis #%d
+== Eje #%d del mando
+
+Mouse
+== Ratón
+
+Ingame mouse sens.
+== Sens. del ratón en el juego
+
+UI mouse sens.
+== Sens. del ratón en el menú
+
+Controller
+== Mando
+
+Show dummy actions
+== Mostrar acciones del dummy
+
+Show freeze bars
+== Mostrar barras de freeze
+
+Show player position
+== Mostrar la posición del jugador
+
+Show player speed
+== Mostrar la velocidad del jugador
+
+Show player target angle
+== Mostrar el ángulo del objetivo del jugador
+
+Adjust the opacity of entities belonging to other teams, such as tees and nameplates
+== Ajusta la opacidad de entidades pertenecientes a otros equipos, como los tees y los nombres.
+
+Opacity of freeze bars inside freeze
+== Opacidad de las barras de freeze dentro del freeze
+
+Normal Color
+== Color normal
+
+Highlight Color
+== Color resaltado
+
+Extras
+== Extras
+
+Preparing demo playback
+== 
+
+Connected
+== 
+
+Loading map file from storage
+== 
+
+Why are you slowmo replaying to read this?
+== 
+
+Initializing components
+== 
+
+Initializing assets
+== 
+
+Initializing map logic
+== 
+
+Sending initial client info
+== 
+
+Uploading map data to GPU
+== 
+
+Getting game info
+== 
+
+Requesting to join the game
+== 
+
+Loading menu images
+== 
+
+Loading demo files
+== 
+
+Loading ghost files
+== 
+
+Loading skin files
+== 
+
+Appearance
+== 
+
+Name Plate
+== 
+
+Hook Collisions
+== 
+
+Show health, shields and ammo
+== 
+
+DDRace HUD
+== 
+
+Show client IDs in scoreboard
+== 
+
+Show DDRace HUD
+== 
+
+Show jumps indicator
+== 
+
+Show hook strength indicator
+== 
+
+Hook collision line
+== 
+
+Hook collision line width
+== 
+
+Hook collision line opacity
+== 
+
+Colors of the hook collision line, in case of a possible collision with:
+== 
+
+Your movements are not taken into account when calculating the line colors
+== 
+
+Nothing hookable
+== 
+
+Something hookable
+== 
+
+A Tee
+== 
+
+Loading assets
+== 
+
+Loading race demo files
+== 
+
+Loading sound files
 == 

@@ -2,10 +2,15 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 
 #include "gameworld.h"
+#include "entities/character.h"
 #include "entity.h"
 #include "gamecontext.h"
-#include <algorithm>
+#include "gamecontroller.h"
+#include "player.h"
+
 #include <engine/shared/config.h>
+
+#include <algorithm>
 #include <utility>
 
 //////////////////////////////////////////////////
@@ -14,25 +19,27 @@
 CGameWorld::CGameWorld()
 {
 	m_pGameServer = 0x0;
+	m_pConfig = 0x0;
 	m_pServer = 0x0;
 
 	m_Paused = false;
 	m_ResetRequested = false;
-	for(int i = 0; i < NUM_ENTTYPES; i++)
-		m_apFirstEntityTypes[i] = 0;
+	for(auto &pFirstEntityType : m_apFirstEntityTypes)
+		pFirstEntityType = 0;
 }
 
 CGameWorld::~CGameWorld()
 {
 	// delete all entities
-	for(int i = 0; i < NUM_ENTTYPES; i++)
-		while(m_apFirstEntityTypes[i])
-			delete m_apFirstEntityTypes[i];
+	for(auto &pFirstEntityType : m_apFirstEntityTypes)
+		while(pFirstEntityType)
+			delete pFirstEntityType;
 }
 
 void CGameWorld::SetGameServer(CGameContext *pGameServer)
 {
 	m_pGameServer = pGameServer;
+	m_pConfig = m_pGameServer->Config();
 	m_pServer = m_pGameServer->Server();
 }
 
@@ -77,11 +84,6 @@ void CGameWorld::InsertEntity(CEntity *pEnt)
 	m_apFirstEntityTypes[pEnt->m_ObjType] = pEnt;
 }
 
-void CGameWorld::DestroyEntity(CEntity *pEnt)
-{
-	pEnt->m_MarkedForDestroy = true;
-}
-
 void CGameWorld::RemoveEntity(CEntity *pEnt)
 {
 	// not in the list
@@ -107,20 +109,32 @@ void CGameWorld::RemoveEntity(CEntity *pEnt)
 //
 void CGameWorld::Snap(int SnappingClient)
 {
+	for(CEntity *pEnt = m_apFirstEntityTypes[ENTTYPE_CHARACTER]; pEnt;)
+	{
+		m_pNextTraverseEntity = pEnt->m_pNextTypeEntity;
+		pEnt->Snap(SnappingClient);
+		pEnt = m_pNextTraverseEntity;
+	}
+
 	for(int i = 0; i < NUM_ENTTYPES; i++)
+	{
+		if(i == ENTTYPE_CHARACTER)
+			continue;
+
 		for(CEntity *pEnt = m_apFirstEntityTypes[i]; pEnt;)
 		{
 			m_pNextTraverseEntity = pEnt->m_pNextTypeEntity;
 			pEnt->Snap(SnappingClient);
 			pEnt = m_pNextTraverseEntity;
 		}
+	}
 }
 
 void CGameWorld::Reset()
 {
 	// reset all entities
-	for(int i = 0; i < NUM_ENTTYPES; i++)
-		for(CEntity *pEnt = m_apFirstEntityTypes[i]; pEnt;)
+	for(auto *pEnt : m_apFirstEntityTypes)
+		for(; pEnt;)
 		{
 			m_pNextTraverseEntity = pEnt->m_pNextTypeEntity;
 			pEnt->Reset();
@@ -128,7 +142,7 @@ void CGameWorld::Reset()
 		}
 	RemoveEntities();
 
-	GameServer()->m_pController->PostReset();
+	GameServer()->m_pController->OnReset();
 	RemoveEntities();
 
 	m_ResetRequested = false;
@@ -137,8 +151,8 @@ void CGameWorld::Reset()
 void CGameWorld::RemoveEntities()
 {
 	// destroy objects marked for destruction
-	for(int i = 0; i < NUM_ENTTYPES; i++)
-		for(CEntity *pEnt = m_apFirstEntityTypes[i]; pEnt;)
+	for(auto *pEnt : m_apFirstEntityTypes)
+		for(; pEnt;)
 		{
 			m_pNextTraverseEntity = pEnt->m_pNextTypeEntity;
 			if(pEnt->m_MarkedForDestroy)
@@ -176,22 +190,22 @@ void CGameWorld::UpdatePlayerMaps()
 				Dist[j].first = 1e10;
 				continue;
 			}
-			CCharacter *ch = GameServer()->m_apPlayers[j]->GetCharacter();
-			if(!ch)
+			CCharacter *pChr = GameServer()->m_apPlayers[j]->GetCharacter();
+			if(!pChr)
 			{
 				Dist[j].first = 1e9;
 				continue;
 			}
 			// copypasted chunk from character.cpp Snap() follows
-			CCharacter *SnapChar = GameServer()->GetPlayerChar(i);
-			if(SnapChar && !SnapChar->m_Super &&
-				!GameServer()->m_apPlayers[i]->IsPaused() && GameServer()->m_apPlayers[i]->GetTeam() != -1 &&
-				!ch->CanCollide(i) &&
+			CCharacter *pSnapChar = GameServer()->GetPlayerChar(i);
+			if(pSnapChar && !pSnapChar->IsSuper() &&
+				!GameServer()->m_apPlayers[i]->IsPaused() && GameServer()->m_apPlayers[i]->GetTeam() != TEAM_SPECTATORS &&
+				!pChr->CanCollide(i) &&
 				(!GameServer()->m_apPlayers[i] ||
 					GameServer()->m_apPlayers[i]->GetClientVersion() == VERSION_VANILLA ||
 					(GameServer()->m_apPlayers[i]->GetClientVersion() >= VERSION_DDRACE &&
-						(GameServer()->m_apPlayers[i]->m_ShowOthers == 0 ||
-							(GameServer()->m_apPlayers[i]->m_ShowOthers == 2 && !GameServer()->m_apPlayers[i]->GetCharacter()->SameTeam(j))))))
+						(GameServer()->m_apPlayers[i]->m_ShowOthers == SHOW_OTHERS_OFF ||
+							(GameServer()->m_apPlayers[i]->m_ShowOthers == SHOW_OTHERS_ONLY_TEAM && !GameServer()->m_apPlayers[i]->GetCharacter()->SameTeam(j))))))
 				Dist[j].first = 1e8;
 			else
 				Dist[j].first = 0;
@@ -199,23 +213,23 @@ void CGameWorld::UpdatePlayerMaps()
 			Dist[j].first += distance(GameServer()->m_apPlayers[i]->m_ViewPos, GameServer()->m_apPlayers[j]->GetCharacter()->m_Pos);
 		}
 
-		// always send the player himself
+		// always send the player themselves
 		Dist[i].first = 0;
 
 		// compute reverse map
-		int rMap[MAX_CLIENTS];
-		for(int j = 0; j < MAX_CLIENTS; j++)
+		int aReverseMap[MAX_CLIENTS];
+		for(int &j : aReverseMap)
 		{
-			rMap[j] = -1;
+			j = -1;
 		}
 		for(int j = 0; j < VANILLA_MAX_CLIENTS; j++)
 		{
 			if(pMap[j] == -1)
 				continue;
-			if(Dist[pMap[j]].first > 5e9)
+			if(Dist[pMap[j]].first > 5e9f)
 				pMap[j] = -1;
 			else
-				rMap[pMap[j]] = j;
+				aReverseMap[pMap[j]] = j;
 		}
 
 		std::nth_element(&Dist[0], &Dist[VANILLA_MAX_CLIENTS - 1], &Dist[MAX_CLIENTS], distCompare);
@@ -225,7 +239,7 @@ void CGameWorld::UpdatePlayerMaps()
 		for(int j = 0; j < VANILLA_MAX_CLIENTS - 1; j++)
 		{
 			int k = Dist[j].second;
-			if(rMap[k] != -1 || Dist[j].first > 5e9)
+			if(aReverseMap[k] != -1 || Dist[j].first > 5e9f)
 				continue;
 			while(Mapc < VANILLA_MAX_CLIENTS && pMap[Mapc] != -1)
 				Mapc++;
@@ -237,8 +251,8 @@ void CGameWorld::UpdatePlayerMaps()
 		for(int j = MAX_CLIENTS - 1; j > VANILLA_MAX_CLIENTS - 2; j--)
 		{
 			int k = Dist[j].second;
-			if(rMap[k] != -1 && Demand-- > 0)
-				pMap[rMap[k]] = -1;
+			if(aReverseMap[k] != -1 && Demand-- > 0)
+				pMap[aReverseMap[k]] = -1;
 		}
 		pMap[VANILLA_MAX_CLIENTS - 1] = -1; // player with empty name to say chat msgs
 	}
@@ -254,27 +268,38 @@ void CGameWorld::Tick()
 		if(GameServer()->m_pController->IsForceBalanced())
 			GameServer()->SendChat(-1, CGameContext::CHAT_ALL, "Teams have been balanced");
 		// update all objects
-		for(int i = 0; i < NUM_ENTTYPES; i++)
-			for(CEntity *pEnt = m_apFirstEntityTypes[i]; pEnt;)
+		if(g_Config.m_SvNoWeakHookAndBounce)
+		{
+			for(auto *pEnt : m_apFirstEntityTypes)
+				for(; pEnt;)
+				{
+					m_pNextTraverseEntity = pEnt->m_pNextTypeEntity;
+					pEnt->PreTick();
+					pEnt = m_pNextTraverseEntity;
+				}
+		}
+
+		for(auto *pEnt : m_apFirstEntityTypes)
+			for(; pEnt;)
 			{
 				m_pNextTraverseEntity = pEnt->m_pNextTypeEntity;
 				pEnt->Tick();
 				pEnt = m_pNextTraverseEntity;
 			}
 
-		for(int i = 0; i < NUM_ENTTYPES; i++)
-			for(CEntity *pEnt = m_apFirstEntityTypes[i]; pEnt;)
+		for(auto *pEnt : m_apFirstEntityTypes)
+			for(; pEnt;)
 			{
 				m_pNextTraverseEntity = pEnt->m_pNextTypeEntity;
-				pEnt->TickDefered();
+				pEnt->TickDeferred();
 				pEnt = m_pNextTraverseEntity;
 			}
 	}
 	else
 	{
 		// update all objects
-		for(int i = 0; i < NUM_ENTTYPES; i++)
-			for(CEntity *pEnt = m_apFirstEntityTypes[i]; pEnt;)
+		for(auto *pEnt : m_apFirstEntityTypes)
+			for(; pEnt;)
 			{
 				m_pNextTraverseEntity = pEnt->m_pNextTypeEntity;
 				pEnt->TickPaused();
@@ -293,6 +318,18 @@ void CGameWorld::Tick()
 		pChar->m_StrongWeakID = StrongWeakID;
 		StrongWeakID++;
 	}
+}
+
+void CGameWorld::SwapClients(int Client1, int Client2)
+{
+	// update all objects
+	for(auto *pEnt : m_apFirstEntityTypes)
+		for(; pEnt;)
+		{
+			m_pNextTraverseEntity = pEnt->m_pNextTypeEntity;
+			pEnt->SwapClients(Client1, Client2);
+			pEnt = m_pNextTraverseEntity;
+		}
 }
 
 // TODO: should be more general
@@ -390,13 +427,12 @@ void CGameWorld::ReleaseHooked(int ClientID)
 	CCharacter *pChr = (CCharacter *)CGameWorld::FindFirst(CGameWorld::ENTTYPE_CHARACTER);
 	for(; pChr; pChr = (CCharacter *)pChr->TypeNext())
 	{
-		CCharacterCore *Core = pChr->Core();
-		if(Core->m_HookedPlayer == ClientID && !pChr->m_Super)
+		CCharacterCore *pCore = pChr->Core();
+		if(pCore->m_HookedPlayer == ClientID && !pChr->IsSuper())
 		{
-			Core->m_HookedPlayer = -1;
-			Core->m_HookState = HOOK_RETRACTED;
-			Core->m_TriggeredEvents |= COREEVENT_HOOK_RETRACT;
-			Core->m_HookState = HOOK_RETRACTED;
+			pCore->SetHookedPlayer(-1);
+			pCore->m_TriggeredEvents |= COREEVENT_HOOK_RETRACT;
+			pCore->m_HookState = HOOK_RETRACTED;
 		}
 	}
 }

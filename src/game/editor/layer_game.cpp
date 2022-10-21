@@ -9,9 +9,7 @@ CLayerGame::CLayerGame(int w, int h) :
 	m_Game = 1;
 }
 
-CLayerGame::~CLayerGame()
-{
-}
+CLayerGame::~CLayerGame() = default;
 
 CTile CLayerGame::GetTile(int x, int y)
 {
@@ -28,25 +26,25 @@ CTile CLayerGame::GetTile(int x, int y)
 
 void CLayerGame::SetTile(int x, int y, CTile tile)
 {
-	if(tile.m_Index == TILE_THROUGH_CUT)
+	if(tile.m_Index == TILE_THROUGH_CUT && m_pEditor->m_SelectEntitiesImage == "DDNet")
 	{
 		if(!m_pEditor->m_Map.m_pFrontLayer)
 		{
-			CLayer *l = new CLayerFront(m_Width, m_Height);
-			m_pEditor->m_Map.MakeFrontLayer(l);
-			m_pEditor->m_Map.m_pGameGroup->AddLayer(l);
+			CLayer *pLayerFront = new CLayerFront(m_Width, m_Height);
+			m_pEditor->m_Map.MakeFrontLayer(pLayerFront);
+			m_pEditor->m_Map.m_pGameGroup->AddLayer(pLayerFront);
 		}
 		CTile nohook = {TILE_NOHOOK};
 		CLayerTiles::SetTile(x, y, nohook);
 		CTile through_cut = {TILE_THROUGH_CUT};
-		m_pEditor->m_Map.m_pFrontLayer->CLayerTiles::SetTile(x, y, through_cut);
+		m_pEditor->m_Map.m_pFrontLayer->CLayerTiles::SetTile(x, y, through_cut); // NOLINT(bugprone-parent-virtual-call)
 	}
 	else
 	{
-		if(m_pEditor->m_Map.m_pFrontLayer && m_pEditor->m_Map.m_pFrontLayer->GetTile(x, y).m_Index == TILE_THROUGH_CUT)
+		if(m_pEditor->m_SelectEntitiesImage == "DDNet" && m_pEditor->m_Map.m_pFrontLayer && m_pEditor->m_Map.m_pFrontLayer->GetTile(x, y).m_Index == TILE_THROUGH_CUT)
 		{
 			CTile air = {TILE_AIR};
-			m_pEditor->m_Map.m_pFrontLayer->CLayerTiles::SetTile(x, y, air);
+			m_pEditor->m_Map.m_pFrontLayer->CLayerTiles::SetTile(x, y, air); // NOLINT(bugprone-parent-virtual-call)
 		}
 		if(m_pEditor->m_AllowPlaceUnusedTiles || IsValidGameTile(tile.m_Index))
 		{

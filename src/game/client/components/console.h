@@ -6,6 +6,10 @@
 #include <game/client/component.h>
 #include <game/client/lineinput.h>
 
+#include <engine/console.h>
+
+#include <mutex>
+
 enum
 {
 	CONSOLE_CLOSED,
@@ -14,34 +18,38 @@ enum
 	CONSOLE_CLOSING,
 };
 
+class CConsoleLogger;
+
 class CGameConsole : public CComponent
 {
+	friend class CConsoleLogger;
 	class CInstance
 	{
 	public:
 		struct CBacklogEntry
 		{
 			float m_YOffset;
-			bool m_Highlighted;
+			ColorRGBA m_PrintColor;
 			char m_aText[1];
 		};
-		TStaticRingBuffer<CBacklogEntry, 64 * 1024, CRingBufferBase::FLAG_RECYCLE> m_Backlog;
-		TStaticRingBuffer<char, 64 * 1024, CRingBufferBase::FLAG_RECYCLE> m_History;
+		std::mutex m_BacklogLock;
+		CStaticRingBuffer<CBacklogEntry, 1024 * 1024, CRingBufferBase::FLAG_RECYCLE> m_Backlog;
+		CStaticRingBuffer<char, 64 * 1024, CRingBufferBase::FLAG_RECYCLE> m_History;
 		char *m_pHistoryEntry;
 
 		CLineInput m_Input;
+		const char *m_pName;
 		int m_Type;
-		int m_CompletionEnumerationCount;
-		int m_BacklogActPage;
+		int m_BacklogCurPage;
 
-	public:
 		CGameConsole *m_pGameConsole;
 
 		char m_aCompletionBuffer[128];
 		int m_CompletionChosen;
+		char m_aCompletionBufferArgument[128];
+		int m_CompletionChosenArgument;
 		int m_CompletionFlagmask;
 		float m_CompletionRenderOffset;
-		bool m_ReverseTAB;
 
 		char m_aUser[32];
 		bool m_UserGot;
@@ -56,36 +64,50 @@ class CGameConsole : public CComponent
 		void Init(CGameConsole *pGameConsole);
 
 		void ClearBacklog();
+		void ClearBacklogYOffsets();
 		void ClearHistory();
+		void Reset();
 
 		void ExecuteLine(const char *pLine);
 
 		void OnInput(IInput::CEvent Event);
-		void PrintLine(const char *pLine, bool Highlighted = false);
+		void PrintLine(const char *pLine, int Len, ColorRGBA PrintColor);
 
 		const char *GetString() const { return m_Input.GetString(); }
-		static void PossibleCommandsCompleteCallback(const char *pStr, void *pUser);
+		static void PossibleCommandsCompleteCallback(int Index, const char *pStr, void *pUser);
+		static void PossibleArgumentsCompleteCallback(int Index, const char *pStr, void *pUser);
 	};
 
 	class IConsole *m_pConsole;
+	CConsoleLogger *m_pConsoleLogger = nullptr;
 
 	CInstance m_LocalConsole;
 	CInstance m_RemoteConsole;
 
 	CInstance *CurrentConsole();
 	float TimeNow();
-	int m_PrintCBIndex;
 
 	int m_ConsoleType;
 	int m_ConsoleState;
 	float m_StateChangeEnd;
 	float m_StateChangeDuration;
 
+	bool m_MouseIsPress = false;
+	int m_MousePressX = 0;
+	int m_MousePressY = 0;
+	int m_MouseCurX = 0;
+	int m_MouseCurY = 0;
+	int m_CurSelStart = 0;
+	int m_CurSelEnd = 0;
+	bool m_HasSelection = false;
+	int m_NewLineCounter = 0;
+
+	int m_LastInputLineCount = 0;
+
 	void Toggle(int Type);
 	void Dump(int Type);
 
-	static void PossibleCommandsRenderCallback(const char *pStr, void *pUser);
-	static void ClientConsolePrintCallback(const char *pStr, void *pUserData, bool Highlighted);
+	static void PossibleCommandsRenderCallback(int Index, const char *pStr, void *pUser);
 	static void ConToggleLocalConsole(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleRemoteConsole(IConsole::IResult *pResult, void *pUserData);
 	static void ConClearLocalConsole(IConsole::IResult *pResult, void *pUserData);
@@ -94,7 +116,6 @@ class CGameConsole : public CComponent
 	static void ConDumpRemoteConsole(IConsole::IResult *pResult, void *pUserData);
 	static void ConConsolePageUp(IConsole::IResult *pResult, void *pUserData);
 	static void ConConsolePageDown(IConsole::IResult *pResult, void *pUserData);
-	static void ConchainConsoleOutputLevelUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
 public:
 	enum
@@ -104,16 +125,19 @@ public:
 	};
 
 	CGameConsole();
+	~CGameConsole();
+	virtual int Sizeof() const override { return sizeof(*this); }
 
 	void PrintLine(int Type, const char *pLine);
 	void RequireUsername(bool UsernameReq);
 
-	virtual void OnStateChange(int NewState, int OldState);
-	virtual void OnConsoleInit();
-	virtual void OnReset();
-	virtual void OnRender();
-	virtual void OnMessage(int MsgType, void *pRawMsg);
-	virtual bool OnInput(IInput::CEvent Events);
+	virtual void OnStateChange(int NewState, int OldState) override;
+	virtual void OnConsoleInit() override;
+	virtual void OnInit() override;
+	virtual void OnReset() override;
+	virtual void OnRender() override;
+	virtual void OnMessage(int MsgType, void *pRawMsg) override;
+	virtual bool OnInput(IInput::CEvent Events) override;
 
 	bool IsClosed() { return m_ConsoleState == CONSOLE_CLOSED; }
 };

@@ -3,9 +3,9 @@
 #ifndef GAME_CLIENT_PREDICTION_ENTITIES_PROJECTILE_H
 #define GAME_CLIENT_PREDICTION_ENTITIES_PROJECTILE_H
 
-#include "character.h"
 #include <game/client/prediction/entity.h>
-#include <game/extrainfo.h>
+
+class CProjectileData;
 
 class CProjectile : public CEntity
 {
@@ -20,7 +20,7 @@ public:
 		vec2 Pos,
 		vec2 Dir,
 		int Span,
-		bool Freeeze,
+		bool Freeze,
 		bool Explosive,
 		float Force,
 		int SoundImpact,
@@ -28,19 +28,17 @@ public:
 		int Number = 0);
 
 	vec2 GetPos(float Time);
-	void FillInfo(CNetObj_Projectile *pProj);
+	CProjectileData GetData() const;
 
-	virtual void Tick();
+	void Tick() override;
 
 	bool Match(CProjectile *pProj);
 	void SetBouncing(int Value);
-	void FillExtraInfo(CNetObj_Projectile *pProj);
 
 	const vec2 &GetDirection() { return m_Direction; }
 	const int &GetOwner() { return m_Owner; }
 	const int &GetStartTick() { return m_StartTick; }
-	CProjectile(CGameWorld *pGameWorld, int ID, CNetObj_Projectile *pProj);
-	virtual int NetworkClipped(vec2 ViewPos);
+	CProjectile(CGameWorld *pGameWorld, int ID, CProjectileData *pProj, const CNetObj_EntityEx *pEntEx = 0);
 
 private:
 	vec2 m_Direction;

@@ -3,20 +3,21 @@
 #ifndef GAME_GAMECORE_H
 #define GAME_GAMECORE_H
 
-#include <base/math.h>
 #include <base/system.h>
+#include <base/vmath.h>
 
 #include <map>
+#include <set>
 #include <vector>
 
-#include "collision.h"
+#include <engine/console.h>
 #include <engine/shared/protocol.h>
 #include <game/generated/protocol.h>
-#include <math.h>
 
-#include "mapitems.h"
 #include "prng.h"
-#include "teamscore.h"
+
+class CCollision;
+class CTeamsCore;
 
 class CTuneParam
 {
@@ -40,16 +41,16 @@ public:
 
 class CTuningParams
 {
+	static const char *ms_apNames[];
+
 public:
 	CTuningParams()
 	{
 		const float TicksPerSecond = 50.0f;
-#define MACRO_TUNING_PARAM(Name, ScriptName, Value, Description) m_##Name.Set((int)(Value * 100.0f));
+#define MACRO_TUNING_PARAM(Name, ScriptName, Value, Description) m_##Name.Set((int)((Value)*100.0f));
 #include "tuning.h"
 #undef MACRO_TUNING_PARAM
 	}
-
-	static const char *ms_apNames[];
 
 #define MACRO_TUNING_PARAM(Name, ScriptName, Value, Description) CTuneParam m_##Name;
 #include "tuning.h"
@@ -61,32 +62,11 @@ public:
 	}
 	bool Set(int Index, float Value);
 	bool Set(const char *pName, float Value);
-	bool Get(int Index, float *pValue);
-	bool Get(const char *pName, float *pValue);
+	bool Get(int Index, float *pValue) const;
+	bool Get(const char *pName, float *pValue) const;
+	static const char *Name(int Index) { return ms_apNames[Index]; }
+	int PossibleTunings(const char *pStr, IConsole::FPossibleCallback pfnCallback = IConsole::EmptyPossibleCommandCallback, void *pUser = nullptr);
 };
-
-inline vec2 GetDirection(int Angle)
-{
-	float a = Angle / 256.0f;
-	return vec2(cosf(a), sinf(a));
-}
-
-inline vec2 GetDir(float Angle)
-{
-	return vec2(cosf(Angle), sinf(Angle));
-}
-
-inline float GetAngle(vec2 Dir)
-{
-	if(Dir.x == 0 && Dir.y == 0)
-		return 0.0f;
-	else if(Dir.x == 0)
-		return Dir.y < 0 ? -pi / 2 : pi / 2;
-	float a = atanf(Dir.y / Dir.x);
-	if(Dir.x < 0)
-		a = a + pi;
-	return a;
-}
 
 inline void StrToInts(int *pInts, int Num, const char *pStr)
 {
@@ -148,24 +128,23 @@ inline vec2 CalcPos(vec2 Pos, vec2 Velocity, float Curvature, float Speed, float
 template<typename T>
 inline T SaturatedAdd(T Min, T Max, T Current, T Modifier)
 {
-	T Old = Current;
 	if(Modifier < 0)
 	{
 		if(Current < Min)
-			return Current - Old;
+			return Current;
 		Current += Modifier;
 		if(Current < Min)
 			Current = Min;
-		return Current - Old;
+		return Current;
 	}
 	else
 	{
 		if(Current > Max)
-			return Current - Old;
+			return Current;
 		Current += Modifier;
 		if(Current > Max)
 			Current = Max;
-		return Current - Old;
+		return Current;
 	}
 }
 
@@ -191,13 +170,31 @@ enum
 	//COREEVENT_HOOK_TELE=0x80,
 };
 
+// show others values - do not change them
+enum
+{
+	SHOW_OTHERS_NOT_SET = -1, // show others value before it is set
+	SHOW_OTHERS_OFF = 0, // show no other players in solo or other teams
+	SHOW_OTHERS_ON = 1, // show all other players in solo and other teams
+	SHOW_OTHERS_ONLY_TEAM = 2 // show players that are in solo and are in the same team
+};
+
+struct SSwitchers
+{
+	bool m_aStatus[MAX_CLIENTS];
+	bool m_Initial;
+	int m_aEndTick[MAX_CLIENTS];
+	int m_aType[MAX_CLIENTS];
+	int m_aLastUpdateTick[MAX_CLIENTS];
+};
+
 class CWorldCore
 {
 public:
 	CWorldCore()
 	{
 		mem_zero(m_apCharacters, sizeof(m_apCharacters));
-		m_pPrng = 0;
+		m_pPrng = nullptr;
 	}
 
 	int RandomOr0(int BelowThis)
@@ -212,26 +209,26 @@ public:
 		return m_pPrng->RandomBits() % BelowThis;
 	}
 
-	CTuningParams m_Tuning[2];
+	CTuningParams m_aTuning[2];
 	class CCharacterCore *m_apCharacters[MAX_CLIENTS];
 	CPrng *m_pPrng;
+
+	void InitSwitchers(int HighestSwitchNumber);
+	std::vector<SSwitchers> m_vSwitchers;
 };
 
 class CCharacterCore
 {
 	friend class CCharacter;
-	CWorldCore *m_pWorld;
+	CWorldCore *m_pWorld = nullptr;
 	CCollision *m_pCollision;
 	std::map<int, std::vector<vec2>> *m_pTeleOuts;
 
 public:
+	static constexpr float PhysicalSize() { return 28.0f; };
+	static constexpr vec2 PhysicalSizeVec2() { return vec2(28.0f, 28.0f); };
 	vec2 m_Pos;
 	vec2 m_Vel;
-	vec2 m_VelDiff; // caused by external forces, applied on posttick
-	vec2 m_SpawnPos;
-	vec2 m_SpawnVel;
-	bool m_Hook;
-	bool m_Collision;
 
 	vec2 m_HookPos;
 	vec2 m_HookDir;
@@ -239,11 +236,31 @@ public:
 	int m_HookTick;
 	int m_HookState;
 	int m_HookedPlayer;
+	std::set<int> m_AttachedPlayers;
+	void SetHookedPlayer(int HookedPlayer);
+
 	int m_ActiveWeapon;
+	struct WeaponStat
+	{
+		int m_AmmoRegenStart;
+		int m_Ammo;
+		int m_Ammocost;
+		bool m_Got;
+	} m_aWeapons[NUM_WEAPONS];
+
+	// ninja
+	struct
+	{
+		vec2 m_ActivationDir;
+		int m_ActivationTick;
+		int m_CurrentMoveTime;
+		int m_OldVelAmount;
+	} m_Ninja;
 
 	bool m_NewHook;
 
 	int m_Jumped;
+	// m_JumpedTotal counts the jumps performed in the air
 	int m_JumpedTotal;
 	int m_Jumps;
 
@@ -253,12 +270,10 @@ public:
 
 	int m_TriggeredEvents;
 
-	void Init(CWorldCore *pWorld, CCollision *pCollision, CTeamsCore *pTeams);
-	void Init(CWorldCore *pWorld, CCollision *pCollision, CTeamsCore *pTeams, std::map<int, std::vector<vec2>> *pTeleOuts);
+	void Init(CWorldCore *pWorld, CCollision *pCollision, CTeamsCore *pTeams = nullptr, std::map<int, std::vector<vec2>> *pTeleOuts = nullptr);
 	void Reset();
-	void Tick(bool UseInput);
-	void PostTick();
-	void PostTick(bool IsClient);
+	void TickDeferred();
+	void Tick(bool UseInput, bool DoDeferredTick = true);
 	void Move();
 
 	void Read(const CNetObj_CharacterCore *pObjCore);
@@ -266,42 +281,43 @@ public:
 	void Quantize();
 
 	// DDRace
-
 	int m_Id;
-	bool m_pReset;
-	class CCollision *Collision() { return m_pCollision; }
+	bool m_Reset;
+	CCollision *Collision() { return m_pCollision; }
 
 	vec2 m_LastVel;
 	int m_Colliding;
 	bool m_LeftWall;
 
-	// DDnet Character
+	// DDNet Character
+	void SetTeamsCore(CTeamsCore *pTeams);
+	void SetTeleOuts(std::map<int, std::vector<vec2>> *pTeleOuts);
 	void ReadDDNet(const CNetObj_DDNetCharacter *pObjDDNet);
 	bool m_Solo;
 	bool m_Jetpack;
-	bool m_NoCollision;
+	bool m_CollisionDisabled;
 	bool m_EndlessHook;
 	bool m_EndlessJump;
-	bool m_NoHammerHit;
-	bool m_NoGrenadeHit;
-	bool m_NoLaserHit;
-	bool m_NoShotgunHit;
-	bool m_NoHookHit;
+	bool m_HammerHitDisabled;
+	bool m_GrenadeHitDisabled;
+	bool m_LaserHitDisabled;
+	bool m_ShotgunHitDisabled;
+	bool m_HookHitDisabled;
 	bool m_Super;
 	bool m_HasTelegunGun;
 	bool m_HasTelegunGrenade;
 	bool m_HasTelegunLaser;
+	int m_FreezeStart;
 	int m_FreezeEnd;
+	bool m_IsInFreeze;
 	bool m_DeepFrozen;
-
-	void Lock() { lock_wait(m_GameCoreLock); }
-	void UnLock() { lock_unlock(m_GameCoreLock); }
+	bool m_LiveFrozen;
+	CTuningParams m_Tuning;
 
 private:
 	CTeamsCore *m_pTeams;
 	int m_MoveRestrictions;
 	static bool IsSwitchActiveCb(int Number, void *pUser);
-	LOCK m_GameCoreLock = 0;
 };
 
 //input count

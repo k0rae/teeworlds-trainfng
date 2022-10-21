@@ -1,7 +1,10 @@
 #ifndef ENGINE_SHARED_PROTOCOL_EX_H
 #define ENGINE_SHARED_PROTOCOL_EX_H
 
-#include <engine/message.h>
+#include <engine/shared/uuid_manager.h>
+
+class CMsgPacker;
+class CUnpacker;
 
 enum
 {
@@ -20,14 +23,18 @@ enum
 	UNPACKMESSAGE_OK,
 	UNPACKMESSAGE_ANSWER,
 
-	SERVERCAP_CURVERSION = 1,
+	SERVERCAP_CURVERSION = 5,
 	SERVERCAPFLAG_DDNET = 1 << 0,
 	SERVERCAPFLAG_CHATTIMEOUTCODE = 1 << 1,
+	SERVERCAPFLAG_ANYPLAYERFLAG = 1 << 2,
+	SERVERCAPFLAG_PINGEX = 1 << 3,
+	SERVERCAPFLAG_ALLOWDUMMY = 1 << 4,
+	SERVERCAPFLAG_SYNCWEAPONINPUT = 1 << 5,
 };
 
-void RegisterUuids(class CUuidManager *pManager);
-bool NetworkExDefaultHandler(int *pID, struct CUuid *pUuid, CUnpacker *pUnpacker, CMsgPacker *pPacker, int Type);
+void RegisterUuids(CUuidManager *pManager);
+bool NetworkExDefaultHandler(int *pID, CUuid *pUuid, CUnpacker *pUnpacker, CMsgPacker *pPacker, int Type);
 
-int UnpackMessageID(int *pID, bool *pSys, struct CUuid *pUuid, CUnpacker *pUnpacker, CMsgPacker *pPacker);
+int UnpackMessageID(int *pID, bool *pSys, CUuid *pUuid, CUnpacker *pUnpacker, CMsgPacker *pPacker);
 
 #endif // ENGINE_SHARED_PROTOCOL_EX_H
