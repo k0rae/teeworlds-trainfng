@@ -213,6 +213,12 @@ MACRO_CONFIG_INT(ClVideoX264Preset, cl_video_preset, 5, 0, 9, CFGFLAG_CLIENT | C
 MACRO_CONFIG_INT(SvHammerScaleX, sv_hammer_scale_x, 320, 1, 1000, CFGFLAG_SERVER, "linearly scale up hammer x power, percentage, for hammering enemies and unfrozen teammates")
 MACRO_CONFIG_INT(SvHammerScaleY, sv_hammer_scale_y, 120, 1, 1000, CFGFLAG_SERVER, "linearly scale up hammer y power, percentage, for hammering enemies and unfrozen teammates")
 
+MACRO_CONFIG_INT(SvPlayerScoreSpikeNormal, sv_player_score_normal, 3, 0, 100, CFGFLAG_SERVER, "Points a player receives for grabbing into normal spikes")
+MACRO_CONFIG_INT(SvPlayerScoreSpikeTeam, sv_player_score_team, 5, 0, 100, CFGFLAG_SERVER, "Points a player receives for grabbing into team spikes")
+MACRO_CONFIG_INT(SvPlayerScoreSpikeGold, sv_player_score_gold, 8, 0, 100, CFGFLAG_SERVER, "Points a player receives for grabbing into golden spikes")
+MACRO_CONFIG_INT(SvPlayerScoreSpikeGreen, sv_player_score_green, 6, 0, 100, CFGFLAG_SERVER, "Points a player receives for grabbing into green spikes(non 4-teams fng only)")
+MACRO_CONFIG_INT(SvPlayerScoreSpikePurple, sv_player_score_purple, 10, 0, 100, CFGFLAG_SERVER, "Points a player receives for grabbing into purple spikes(non 4-teams fng only)")
+
 // debug
 #ifdef CONF_DEBUG // this one can crash the server if not used correctly
 MACRO_CONFIG_INT(DbgDummies, dbg_dummies, 0, 0, 15, CFGFLAG_SERVER, "(Debug build only)")

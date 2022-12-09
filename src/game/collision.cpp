@@ -283,11 +283,6 @@ int CCollision::GetTile(int x, int y) const
 	int Ny = clamp(y / 32, 0, m_Height - 1);
 	int pos = Ny * m_Width + Nx;
 
-	int idx = m_pTiles[pos].m_Index;
-	if(idx == TILE_SPIKE_GOLD || idx == TILE_SPIKE_NORMAL || idx == TILE_SPIKE_RED ||
-		idx == TILE_SPIKE_BLUE || idx == TILE_SPIKE_GREEN || idx == TILE_SPIKE_PURPLE)
-		return TILE_DEATH;
-
 	if(m_pTiles[pos].m_Index >= TILE_SOLID && m_pTiles[pos].m_Index <= TILE_NOLASER)
 		return m_pTiles[pos].m_Index;
 	return 0;
@@ -826,6 +821,8 @@ bool CCollision::TileExists(int Index) const
 	if(Index < 0)
 		return false;
 
+	if((m_pTiles[Index].m_Index >= TILE_SPIKE_GOLD && m_pTiles[Index].m_Index <= TILE_SPIKE_BLUE) || m_pTiles[Index].m_Index == TILE_SPIKE_GREEN || m_pTiles[Index].m_Index == TILE_SPIKE_PURPLE)
+		return true;
 	if((m_pTiles[Index].m_Index >= TILE_FREEZE && m_pTiles[Index].m_Index <= TILE_TELE_LASER_DISABLE) || (m_pTiles[Index].m_Index >= TILE_LFREEZE && m_pTiles[Index].m_Index <= TILE_LUNFREEZE))
 		return true;
 	if(m_pFront && ((m_pFront[Index].m_Index >= TILE_FREEZE && m_pFront[Index].m_Index <= TILE_TELE_LASER_DISABLE) || (m_pFront[Index].m_Index >= TILE_LFREEZE && m_pFront[Index].m_Index <= TILE_LUNFREEZE)))

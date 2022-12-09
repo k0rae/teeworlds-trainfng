@@ -167,7 +167,11 @@ void CProjectile::Tick()
 					(m_Owner != -1) ? TeamMask : -1LL);
 			}
 			if(pTargetChr && pTargetChr->m_FreezeTime == 0)
+			{
+				GameServer()->CreateSound(pTargetChr->Core()->m_Pos, SOUND_HIT, pTargetChr->TeamMask());
 				pTargetChr->Freeze();
+				pTargetChr->Hit(m_Owner, WEAPON_GRENADE);
+			}
 		}
 		else if(m_Freeze)
 		{

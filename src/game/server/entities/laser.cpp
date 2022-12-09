@@ -10,6 +10,7 @@
 
 #include <game/server/gamecontext.h>
 #include <game/server/gamemodes/DDRace.h>
+#include <game/server/player.h>
 
 CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEnergy, int Owner, int Type) :
 	CEntity(pGameWorld, CGameWorld::ENTTYPE_LASER)
@@ -95,7 +96,9 @@ bool CLaser::HitCharacter(vec2 From, vec2 To)
 	else if(m_Type == WEAPON_LASER && pHit != pOwnerChar && pHit->m_FreezeTime == 0)
 	{
 		GameServer()->CreateSound(pHit->Core()->m_Pos, SOUND_HIT, m_TeamMask);
+		GameServer()->m_apPlayers[m_Owner]->m_Score++;
 		pHit->Freeze();
+		pHit->Hit(m_Owner, WEAPON_LASER);
 	}
 	return true;
 }

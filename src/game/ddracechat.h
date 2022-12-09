@@ -44,5 +44,6 @@ CHAT_COMMAND("kill", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConProtectedKill, this, 
 
 CHAT_COMMAND("spawn", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConSpawnSetCurrentPosition, this, "Set spawn position")
 CHAT_COMMAND("spawnreset", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConSpawnResetPosition, this, "Reset spawn position")
+CHAT_COMMAND("pointsreset", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConPointsReset, this, "Reset points")
 
 #undef CHAT_COMMAND

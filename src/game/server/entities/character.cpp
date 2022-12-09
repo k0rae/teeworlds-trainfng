@@ -465,21 +465,23 @@ void CCharacter::FireWeapon()
 			else
 				GameServer()->CreateHammerHit(ProjStartPos, TeamMask());
 
-			vec2 Dir;
-			if(length(pTarget->m_Pos - m_Pos) > 0.0f)
-				Dir = normalize(pTarget->m_Pos - m_Pos);
-			else
-				Dir = vec2(0.f, -1.f);
+			// vec2 Dir;
+			// if(length(pTarget->m_Pos - m_Pos) > 0.0f)
+			// 	Dir = normalize(pTarget->m_Pos - m_Pos);
+			// else
+			// 	Dir = vec2(0.f, -1.f);
 
-			vec2 Force = (vec2(0.f, -1.f) + normalize(Dir + vec2(0.f, -1.1f)) * 10.0f);
-			Force.x *= g_Config.m_SvHammerScaleX * 0.01f;
-			Force.y *= g_Config.m_SvHammerScaleY * 0.01f;
-			pTarget->TakeDamage(Force, g_pData->m_Weapons.m_Hammer.m_pBase->m_Damage, m_pPlayer->GetCID(), m_Core.m_ActiveWeapon);
+			// vec2 Force = (vec2(0.f, -1.f) + normalize(Dir + vec2(0.f, -1.1f)) * 10.0f);
+			// Force.x *= g_Config.m_SvHammerScaleX * 0.01f;
+			// Force.y *= g_Config.m_SvHammerScaleY * 0.01f;
+			// pTarget->TakeDamage(Force, g_pData->m_Weapons.m_Hammer.m_pBase->m_Damage, m_pPlayer->GetCID(), m_Core.m_ActiveWeapon);
 
 			if(m_FreezeHammer)
 				pTarget->Freeze();
 
 			Antibot()->OnHammerHit(m_pPlayer->GetCID(), pTarget->GetPlayer()->GetCID());
+
+			pTarget->TakeHammerHit(this);
 
 			Hits++;
 		}
@@ -929,16 +931,6 @@ void CCharacter::Die(int Killer, int Weapon)
 	// a nice sound
 	GameServer()->CreateSound(m_Pos, SOUND_PLAYER_DIE, TeamMask());
 
-	m_pPlayer->m_PreviousDieTickPos++;
-	int tick20DieAgo = m_pPlayer->m_aPreviousDieTick[m_pPlayer->m_PreviousDieTickPos % 20];
-	m_pPlayer->m_aPreviousDieTick[m_pPlayer->m_PreviousDieTickPos % 20] = Server()->Tick();
-
-	if(Server()->Tick() - tick20DieAgo < 100)
-	{
-		m_pPlayer->m_SpawnPos = vec2(0.0f, 0.0f);
-		m_pPlayer->m_SpawnVel = vec2(0.0f, 0.0f);
-	}
-
 	m_Alive = false;
 	SetSolo(false);
 
@@ -951,6 +943,9 @@ void CCharacter::Die(int Killer, int Weapon)
 bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 {
 	m_Core.m_Vel += Force;
+
+	Hit(From, Weapon);
+
 	return false;
 }
 
@@ -1421,6 +1416,15 @@ void CCharacter::HandleTiles(int Index)
 		m_TeleCheckpoint = TeleCheckpoint;
 
 	GameServer()->m_pController->HandleCharacterTiles(this, Index);
+
+	if(
+		m_TileIndex == TILE_SPIKE_GOLD ||
+		m_TileIndex == TILE_SPIKE_NORMAL ||
+		m_TileIndex == TILE_SPIKE_BLUE ||
+		m_TileIndex == TILE_SPIKE_RED ||
+		m_TileIndex == TILE_SPIKE_GREEN ||
+		m_TileIndex == TILE_SPIKE_PURPLE)
+		DieSpikes(m_TileIndex);
 
 	// endless hook
 	if(((m_TileIndex == TILE_EHOOK_ENABLE) || (m_TileFIndex == TILE_EHOOK_ENABLE)))
@@ -2299,4 +2303,116 @@ int64_t CCharacter::TeamMask()
 void CCharacter::SwapClients(int Client1, int Client2)
 {
 	m_Core.SetHookedPlayer(m_Core.m_HookedPlayer == Client1 ? Client2 : m_Core.m_HookedPlayer == Client2 ? Client1 : m_Core.m_HookedPlayer);
+}
+
+bool CCharacter::IsFrozen()
+{
+	return m_FreezeTime != 0;
+}
+
+void CCharacter::DieSpikes(int tile)
+{
+	int plrid, klrid;
+	CNetMsg_Sv_KillMsg msg;
+
+	plrid = m_pPlayer->GetCID();
+	// if the player leaves the game, he will be nullptr and we handle it like a selfkill
+	if(plrid == -1 || !GameServer()->m_apPlayers[plrid])
+		plrid = m_pPlayer->GetCID();
+
+	if(!IsFrozen() || m_Core.m_Killer < 0)
+	{
+		msg.m_Killer = plrid;
+		msg.m_Weapon = WEAPON_WORLD;
+		GameServer()->m_pController->OnCharacterDeath(this, 0, WEAPON_WORLD);
+	}
+	else
+	{
+		msg.m_Killer = klrid = m_Core.m_Killer;
+		msg.m_Weapon = WEAPON_NINJA;
+		GameServer()->m_pController->OnCharacterDeath(this,
+			GameServer()->m_apPlayers[klrid], tile);
+
+		char aBuf[256];
+		str_format(aBuf, sizeof(aBuf), "kill spikes killer='%d:%s' victim='%d:%s' tile=%d",
+			klrid, Server()->ClientName(klrid), plrid,
+			Server()->ClientName(plrid), tile);
+		GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
+
+		// set attacker's face to happy (taunt!)
+		CCharacter *pKiller = ((CPlayer *)GameServer()->m_apPlayers[klrid])->GetCharacter();
+		if(pKiller)
+			pKiller->SetEmote(EMOTE_HAPPY, Server()->Tick() + Server()->TickSpeed());
+
+		GameServer()->CreateSoundGlobal(SOUND_CTF_CAPTURE, klrid);
+		GameServer()->CreateSoundGlobal(SOUND_CTF_GRAB_PL, plrid);
+	}
+
+	msg.m_Victim = plrid;
+	msg.m_ModeSpecial = 0;
+	Server()->SendPackMsg(&msg, MSGFLAG_VITAL, -1);
+
+	// a nice sound
+	GameServer()->CreateSound(m_Pos, SOUND_PLAYER_DIE, TeamMask());
+
+	// this is for auto respawn after 3 secs
+	// m_pPlayer->m_DieTick = Server()->Tick();
+
+	GameServer()->m_World.RemoveEntity(this);
+	Destroy();
+	GameServer()->CreateDeath(m_Pos, plrid, TeamMask());
+}
+
+void CCharacter::Hit(int From, int Weapon)
+{
+	m_Core.m_Killer = From;
+	int cid;
+
+	if(Weapon == WEAPON_HAMMER)
+	{
+		return;
+	}
+	cid = m_pPlayer->GetCID();
+	if(m_FreezeTime || From == cid)
+		return;
+	// if ((t = Teams()->m_Core.Team(cid)) == Teams()->m_Core.Team(From) && t != TEAM_FLOCK)
+	// 	return;
+
+	GameServer()->m_pController->OnCharacterDeath(this, GameServer()->m_apPlayers[From], Weapon);
+	GameServer()->m_apPlayers[From]->m_Score++;
+	Freeze();
+
+	char aBuf[256];
+	str_format(aBuf, sizeof(aBuf), "hit killer='%d:%s' victim='%d:%s' weapon=%d",
+		From, Server()->ClientName(From),
+		m_pPlayer->GetCID(), Server()->ClientName(m_pPlayer->GetCID()), Weapon);
+	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
+
+	// send the kill message
+	CNetMsg_Sv_KillMsg Msg;
+	Msg.m_Killer = From;
+	Msg.m_Victim = m_pPlayer->GetCID();
+	Msg.m_Weapon = Weapon;
+	Msg.m_ModeSpecial = 0;
+	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, -1);
+
+	GameServer()->CreateSoundGlobal(SOUND_HIT, From);
+	GameServer()->CreateDeath(m_Pos, m_pPlayer->GetCID());
+}
+
+void CCharacter::TakeHammerHit(CCharacter *pFrom)
+{
+	vec2 Dir;
+
+	if(length(m_Pos - pFrom->m_Pos) > 0.0f)
+		Dir = normalize(m_Pos - pFrom->m_Pos);
+	else
+		Dir = vec2(0.f, -1.f);
+
+	vec2 Push = vec2(0.f, -1.f) + normalize(Dir + vec2(0.f, -1.1f)) * 10.0f;
+	Push.x *= g_Config.m_SvHammerScaleX * 0.01f;
+	Push.y *= g_Config.m_SvHammerScaleY * 0.01f;
+	m_Core.m_Vel += Push;
+
+	m_Core.m_Killer = pFrom->m_pPlayer->GetCID();
 }

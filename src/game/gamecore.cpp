@@ -97,6 +97,7 @@ void CCharacterCore::Reset()
 	m_Jumped = 0;
 	m_JumpedTotal = 0;
 	m_Jumps = 2;
+	m_Killer = -1;
 	m_TriggeredEvents = 0;
 
 	// DDNet Character
@@ -646,6 +647,8 @@ void CCharacterCore::SetHookedPlayer(int HookedPlayer)
 			CCharacterCore *pCharCore = m_pWorld->m_apCharacters[HookedPlayer];
 			if(pCharCore)
 			{
+				if(pCharCore->m_AttachedPlayers.empty())
+					pCharCore->m_Killer = m_Id;
 				pCharCore->m_AttachedPlayers.insert(m_Id);
 			}
 		}

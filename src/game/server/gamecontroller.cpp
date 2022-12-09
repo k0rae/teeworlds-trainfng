@@ -482,6 +482,53 @@ void IGameController::OnReset()
 
 int IGameController::OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon)
 {
+	CPlayer *pVictimPlayer = pVictim->GetPlayer();
+	pVictimPlayer->m_PreviousDieTickPos++;
+	int tick20DieAgo = pVictimPlayer->m_aPreviousDieTick[pVictimPlayer->m_PreviousDieTickPos % 20];
+	pVictimPlayer->m_aPreviousDieTick[pVictimPlayer->m_PreviousDieTickPos % 20] = Server()->Tick();
+
+	if(Server()->Tick() - tick20DieAgo < 100)
+	{
+		pVictimPlayer->m_SpawnPos = vec2(0.0f, 0.0f);
+		pVictimPlayer->m_SpawnVel = vec2(0.0f, 0.0f);
+	}
+
+	// do scoreing
+	if(!pKiller || Weapon == WEAPON_GAME)
+		return 0;
+	if(pKiller != pVictimPlayer && pKiller->GetCharacter())
+	{
+		int pts = 0;
+		if(Weapon == TILE_SPIKE_NORMAL)
+		{
+			pts = g_Config.m_SvPlayerScoreSpikeNormal;
+		}
+		else if(Weapon == TILE_SPIKE_RED)
+		{
+			pts = g_Config.m_SvPlayerScoreSpikeTeam;
+		}
+		else if(Weapon == TILE_SPIKE_BLUE)
+		{
+			pts = g_Config.m_SvPlayerScoreSpikeTeam;
+		}
+		else if(Weapon == TILE_SPIKE_GREEN)
+		{
+			pts = g_Config.m_SvPlayerScoreSpikeGreen;
+		}
+		else if(Weapon == TILE_SPIKE_PURPLE)
+		{
+			pts = g_Config.m_SvPlayerScoreSpikePurple;
+		}
+		else if(Weapon == TILE_SPIKE_GOLD)
+		{
+			pts = g_Config.m_SvPlayerScoreSpikeGold;
+		}
+		if(pts)
+		{
+			pKiller->m_Score += pts;
+			GameServer()->MakeLaserTextPoints(pKiller->GetCharacter()->m_Pos, pKiller->GetCID(), pts);
+		}
+	}
 	return 0;
 }
 
@@ -586,7 +633,7 @@ void IGameController::Snap(int SnappingClient)
 		return;
 
 	pGameInfoEx->m_Flags =
-		GAMEINFOFLAG_TIMESCORE |
+		// GAMEINFOFLAG_TIMESCORE |
 		//GAMEINFOFLAG_GAMETYPE_RACE |
 		//GAMEINFOFLAG_GAMETYPE_DDRACE |
 		//GAMEINFOFLAG_GAMETYPE_DDNET |

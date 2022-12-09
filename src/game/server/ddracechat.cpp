@@ -125,6 +125,18 @@ void CGameContext::ConSpawnResetPosition(IConsole::IResult *pResult, void *pUser
 	pSelf->SendChatTarget(pPlayer->GetCID(), "Spawn position reseted");
 }
 
+void CGameContext::ConPointsReset(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!CheckClientID(pResult->m_ClientID))
+		return;
+	CPlayer *pPlayer = pSelf->m_apPlayers[pResult->m_ClientID];
+	if(!pPlayer)
+		return;
+	pPlayer->m_Score = 0;
+	pSelf->SendChatTarget(pPlayer->GetCID(), "Points reseted");
+}
+
 void CGameContext::ConSettings(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;

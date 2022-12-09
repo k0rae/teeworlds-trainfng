@@ -248,6 +248,8 @@ function(add_linker_flag_if_supported VARIABLE FLAG)
   endif()
 endfunction()
 
+add_cxx_compiler_flag_if_supported(OUR_FLAGS -fsigned-char)
+
 # Force compiler colors on when using ninja. Ninja filters the colors out when
 # it's not printing to a terminal on its own.
 if(CMAKE_GENERATOR STREQUAL "Ninja")
@@ -2313,6 +2315,8 @@ if(SERVER)
     gamemodes/DDRace.h
     gameworld.cpp
     gameworld.h
+    laserText.cpp
+    laserText.h
     player.cpp
     player.h
     save.cpp
