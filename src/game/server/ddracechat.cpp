@@ -104,6 +104,11 @@ void CGameContext::ConSpawnSetCurrentPosition(IConsole::IResult *pResult, void *
 	if(!pPlayer)
 		return;
 
+	if(!g_Config.m_SvAllowSpawn)
+	{
+		pSelf->SendChatTarget(pPlayer->GetCID(), "/spawn is disabled");
+		return;
+	}
 	CCharacter *pChar = pPlayer->GetCharacter();
 	if(!pChar)
 		return;

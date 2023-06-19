@@ -2167,6 +2167,8 @@ void CGameClient::ConTeam(IConsole::IResult *pResult, void *pUserData)
 
 void CGameClient::ConKill(IConsole::IResult *pResult, void *pUserData)
 {
+	if (!g_Config.m_SvAllowKill)
+		return;
 	((CGameClient *)pUserData)->SendKill(-1);
 }
 

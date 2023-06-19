@@ -739,6 +739,11 @@ void CPlayer::ProcessPause()
 
 int CPlayer::Pause(int State, bool Force)
 {
+	if(!g_Config.m_SvAllowSpec)
+	{
+		GameServer()->SendChatTarget(m_ClientID, "/spec is disabled");
+		return 0;
+	}
 	if(State < PAUSE_NONE || State > PAUSE_SPEC) // Invalid pause state passed
 		return 0;
 
